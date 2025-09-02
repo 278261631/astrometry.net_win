@@ -1,0 +1,95 @@
+===============================================================================
+                    ASTROMETRY.NET WINDOWS版本 - 安装检查清单
+===============================================================================
+
+在使用astrometry.net之前，请确保完成以下所有步骤：
+
+□ 1. 下载必需的依赖软件包
+    □ netpbm-10.27-bin.zip
+    □ ImageMagick-7.1.2-3-Q16-x64-static.exe  
+    □ gawk-3.1.6-1-bin.zip
+    □ jpeg-6b-4-bin.zip
+
+□ 2. 安装依赖软件
+    □ 解压netpbm-10.27-bin.zip到 C:\GnuWin32\
+    □ 运行ImageMagick-7.1.2-3-Q16-x64-static.exe安装程序
+    □ 解压gawk-3.1.6-1-bin.zip到 C:\GnuWin32\
+    □ 解压jpeg-6b-4-bin.zip到 C:\GnuWin32\
+
+□ 3. 配置环境变量
+    □ 将 C:\GnuWin32\bin 添加到系统PATH
+    □ 确认ImageMagick路径在系统PATH中
+
+□ 4. 创建索引文件目录
+    □ 创建目录: E:\astrometry.net.index\
+
+□ 5. 下载索引文件
+    □ 从 http://data.astrometry.net/ 下载索引文件
+    □ 将索引文件放置在 E:\astrometry.net.index\ 目录中
+    
+    推荐下载的索引文件（根据需要选择）：
+    □ index-4219.fits (超大视场: 1400-2000 arcmin)
+    □ index-4218.fits (超大视场: 1000-1400 arcmin) 
+    □ index-4217.fits (大视场: 680-1000 arcmin)
+    □ index-4216.fits (大视场: 480-680 arcmin)
+    □ index-4215.fits (中等视场: 340-480 arcmin)
+    □ index-4214.fits (中等视场: 240-340 arcmin)
+    □ index-4213.fits (中等视场: 170-240 arcmin)
+    □ index-4212.fits (中等视场: 120-170 arcmin)
+    □ index-4211.fits (小视场: 85-120 arcmin)
+    □ index-4210.fits (小视场: 60-85 arcmin)
+
+□ 6. 编译astrometry.net
+    □ 打开命令提示符
+    □ 进入win目录: cd E:\github\astrometry.net_win\win
+    □ 运行: build.bat
+    □ 确认编译成功，没有错误
+
+□ 7. 验证安装
+    □ 测试命令: build\bin\solve-field.exe --help
+    □ 确认显示帮助信息，没有"找不到文件"错误
+
+□ 8. 功能测试
+    □ 准备一张测试图像（JPEG格式）
+    □ 运行: build\bin\solve-field.exe --verbose test_image.jpg
+    □ 检查是否能正常处理图像和提取源
+
+===============================================================================
+                                验证命令
+===============================================================================
+
+1. 检查PATH环境变量:
+   echo %PATH%
+
+2. 验证工具可用性:
+   jpegtopnm --version
+   ppmtopgm --help
+   gawk --version
+   magick --version
+
+3. 检查索引文件:
+   dir E:\astrometry.net.index\
+
+4. 测试astrometry.net:
+   build\bin\solve-field.exe --help
+
+===============================================================================
+                              常见问题解决
+===============================================================================
+
+问题: "找不到jpegtopnm"
+解决: 确保netpbm已安装且C:\GnuWin32\bin在PATH中
+
+问题: "找不到索引文件"  
+解决: 确认索引文件在E:\astrometry.net.index\目录中
+
+问题: "内存映射失败"
+解决: 确保有足够内存，尝试使用较少的索引文件
+
+问题: 编译失败
+解决: 确保安装了CMake和MinGW-w64
+
+===============================================================================
+
+完成所有检查项目后，astrometry.net应该可以正常工作。
+如有问题，请参考README_WINDOWS_SETUP.md获取详细信息。

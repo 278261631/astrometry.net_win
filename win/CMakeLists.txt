@@ -514,7 +514,13 @@ add_custom_target(copy_dlls ALL
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/image2pnm.bat"
         ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-    COMMENT "Copying DLL dependencies and scripts"
+
+    # 复制NetPBM和GAWK工具（如果存在）
+    COMMAND ${CMAKE_COMMAND}
+        -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/copy_netpbm_tools.cmake"
+
+    COMMENT "Copying DLL dependencies, scripts and NetPBM tools"
 )
 
 # 确保在构建solve-field和astrometry-engine后复制DLL

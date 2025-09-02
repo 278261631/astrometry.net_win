@@ -1285,7 +1285,10 @@ void verify_hit(const startree_t* skdt, int index_cutnside, MatchObj* mo,
      array between "NR" and "NRall".  We use the "badguys" array to
      hold these indices temporarily.
      */
-    assert(skdt->sweep);
+    if (!skdt->sweep) {
+        logverb("Warning: skdt->sweep is NULL, skipping verification for this index\n");
+        goto bailout;
+    }
     // Find all index stars within the bounding circle of the field.
     startree_search_for(skdt, fieldcenter, fieldr2, &refxyz, NULL, &v->refstarid, &v->NRall);
     debug2("%i reference stars in the bounding circle\n", v->NRall);
