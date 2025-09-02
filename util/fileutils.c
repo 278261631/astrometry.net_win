@@ -32,13 +32,24 @@ char* find_executable(const char* progname, const char* sibling) {
     char* path;
     char* pathenv;
     char* progname_with_ext = NULL;
+    char* result = NULL;
 
 #ifdef _WIN32
-    // On Windows, add .exe extension if not present
-    if (!strstr(progname, ".exe")) {
-        asprintf_safe(&progname_with_ext, "%s.exe", progname);
-        progname = progname_with_ext;
+    // On Windows, try different extensions if no extension is present
+    if (!strstr(progname, ".exe") && !strstr(progname, ".bat") && !strstr(progname, ".cmd")) {
+        // Try .exe first, then .bat
+        char* extensions[] = {".exe", ".bat", ".cmd", NULL};
+        for (int i = 0; extensions[i] && !result; i++) {
+            asprintf_safe(&progname_with_ext, "%s%s", progname, extensions[i]);
+            result = find_executable(progname_with_ext, sibling);
+            free(progname_with_ext);
+            progname_with_ext = NULL;
+        }
+        return result;
     }
+
+    // If extension is already present, use it as-is
+    progname_with_ext = NULL;
 
     // If it's an absolute path, just return it.
     if (progname[0] == '/' || (progname[1] == ':' && progname[0] != '\0'))

@@ -454,17 +454,71 @@ static int readfd(int fd, char* buf, int NB, char** pcursor,
 
 int run_command_get_outputs(const char* cmd, sl** outlines, sl** errlines) {
 #ifdef _WIN32
-    /* Simplified Windows implementation using system() */
-    /* This is a basic implementation - for full functionality, would need CreateProcess */
-    int result = system(cmd);
+    /* Windows implementation using temporary files for output capture */
+    char temp_out[MAX_PATH];
+    char temp_err[MAX_PATH];
+    char full_cmd[4096];
+    FILE* fp;
+    char line[1024];
+    int result;
 
+    // Create temporary files in local temp directory
+    char temp_dir[MAX_PATH];
+    strcpy(temp_dir, "temp");  // Use our standard temp directory
+    CreateDirectory(temp_dir, NULL);  // Ignore error if directory exists
+
+    // Create temp file paths
+    snprintf(temp_out, sizeof(temp_out), "%s\\astrometry_out.tmp", temp_dir);
+    snprintf(temp_err, sizeof(temp_err), "%s\\astrometry_err.tmp", temp_dir);
+
+    // Build command with output redirection
+    snprintf(full_cmd, sizeof(full_cmd), "%s > \"%s\" 2> \"%s\"", cmd, temp_out, temp_err);
+
+    // Run the command using cmd to ensure proper redirection
+    char cmd_wrapper[4096];
+    snprintf(cmd_wrapper, sizeof(cmd_wrapper), "cmd /c \"%s\"", full_cmd);
+    result = system(cmd_wrapper);
+
+    // Read stdout if requested
     if (outlines) {
-        *outlines = sl_new(1);
-        sl_append(*outlines, "Output capture not implemented on Windows");
+        *outlines = sl_new(4);
+        fp = fopen(temp_out, "r");
+        if (fp) {
+            while (fgets(line, sizeof(line), fp)) {
+                // Remove trailing newline
+                int len = strlen(line);
+                if (len > 0 && line[len-1] == '\n') {
+                    line[len-1] = '\0';
+                }
+                if (len > 1 && line[len-2] == '\r') {
+                    line[len-2] = '\0';
+                }
+                sl_append(*outlines, line);
+            }
+            fclose(fp);
+        }
+        DeleteFile(temp_out);
     }
+
+    // Read stderr if requested
     if (errlines) {
-        *errlines = sl_new(1);
-        sl_append(*errlines, "Error capture not implemented on Windows");
+        *errlines = sl_new(4);
+        fp = fopen(temp_err, "r");
+        if (fp) {
+            while (fgets(line, sizeof(line), fp)) {
+                // Remove trailing newline
+                int len = strlen(line);
+                if (len > 0 && line[len-1] == '\n') {
+                    line[len-1] = '\0';
+                }
+                if (len > 1 && line[len-2] == '\r') {
+                    line[len-2] = '\0';
+                }
+                sl_append(*errlines, line);
+            }
+            fclose(fp);
+        }
+        DeleteFile(temp_err);
     }
 
     return result;
@@ -721,11 +775,20 @@ char* shell_escape(const char* str) {
 }
 
 static char* get_temp_dir() {
+#ifdef _WIN32
+    // On Windows, use our custom temp directory
+    char* dir = getenv("TMP");
+    if (!dir) {
+        dir = "temp";  // Use local temp directory instead of system temp
+    }
+    return dir;
+#else
     char* dir = getenv("TMP");
     if (!dir) {
         dir = "/tmp";
     }
     return dir;
+#endif
 }
 
 char* create_temp_file(const char* fn, const char* dir) {

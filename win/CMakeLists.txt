@@ -304,8 +304,17 @@ add_executable(test-find-executable test-find-executable.c)
 # 创建 an-fitstopnm 可执行文件
 add_executable(an-fitstopnm ../util/an-fitstopnm.c)
 
+# 创建 an-pnmtofits 可执行文件
+add_executable(an-pnmtofits ../util/an-pnmtofits.c)
+
 # 创建 image2pnm 包装器可执行文件
 add_executable(image2pnm image2pnm.c)
+
+# 创建 removelines 可执行文件
+add_executable(removelines removelines.c)
+
+# 创建 uniformize 可执行文件
+add_executable(uniformize uniformize.c)
 target_link_libraries(solve-field
     astrometry
     catalogs
@@ -349,8 +358,40 @@ target_link_libraries(an-fitstopnm
     m
 )
 
+# 链接 an-pnmtofits
+target_link_libraries(an-pnmtofits
+    anutils
+    anbase
+    qfits
+    ${CFITSIO_LIBRARIES}
+    ws2_32
+    regex
+    m
+)
+
 # 链接 image2pnm (简单包装器，只需要基本库)
 target_link_libraries(image2pnm
+    m
+)
+
+# 链接 removelines
+target_link_libraries(removelines
+    anfiles
+    anutils
+    anbase
+    qfits
+    ${CFITSIO_LIBRARIES}
+    ws2_32
+    regex
+    m
+)
+
+# 链接 uniformize
+target_link_libraries(uniformize
+    anutils
+    anbase
+    ws2_32
+    regex
     m
 )
 

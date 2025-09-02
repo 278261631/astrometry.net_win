@@ -11,7 +11,11 @@
 #if HAVE_NETPBM
 #include <netpbm/pam.h>
 #else
+#ifdef _WIN32
+#include <winsock2.h>
+#else
 #include <arpa/inet.h>
+#endif
 #endif
 
 #include "log.h"

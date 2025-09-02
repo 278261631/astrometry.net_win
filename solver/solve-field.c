@@ -848,6 +848,16 @@ int main(int argc, char** args) {
 
     augment_xylist_init(allaxy);
 
+#ifdef _WIN32
+    // Set custom temp directory for Windows
+    char* custom_temp_dir = "temp";
+    if (mkdir_p(custom_temp_dir)) {
+        ERROR("Failed to create temp directory %s", custom_temp_dir);
+        exit(-1);
+    }
+    allaxy->tempdir = custom_temp_dir;
+#endif
+
     // default output filename patterns.
     allaxy->axyfn    = "%s.axy";
     allaxy->matchfn  = "%s.match";

@@ -760,7 +760,7 @@ int augment_xylist(augment_xylist_t* axy,
             sl_free2(lines);
 
             // Get image W, H, depth.
-            sl_append(cmd, "pnmfile");
+            append_executable(cmd, "pnmfile", me);
             append_escape(cmd, pnmfn);
             lines = backtick(cmd, verbose);
 
@@ -770,14 +770,27 @@ int augment_xylist(augment_xylist_t* axy,
             }
             line = sl_get(lines, 0);
             // eg       "/tmp/pnm:       PPM raw, 800 by 510  maxval 255"
-            if (strlen(pnmfn) + 1 >= strlen(line)) {
-                ERROR("Failed to parse output from pnmfile: \"%s\"", line);
+            // or on Windows: "OuDS: PPM raw, 800 by 526  maxval 255"
+
+            // Find the last colon separator (to handle Windows drive letters)
+            char* colon = strrchr(line, ':');
+            if (!colon) {
+                ERROR("Failed to parse output from pnmfile (no colon): \"%s\"", line);
                 exit(-1);
             }
-            line += strlen(pnmfn) + 1;
-            // "PBM raw, 750 by 864"
-            if (sscanf(line, " P%cM %255s %d by %d",
-                       &pnmtype, typestr, &axy->W, &axy->H) != 4) {
+            line = colon + 1;
+
+            // "PPM raw, 800 by 526  maxval 255" or "PBM raw, 750 by 864"
+            // Try parsing with comma after type
+            if (sscanf(line, " P%cM %255s, %d by %d",
+                       &pnmtype, typestr, &axy->W, &axy->H) == 4) {
+                // Success
+            } else if (sscanf(line, " P%cM %255s %d by %d",
+                              &pnmtype, typestr, &axy->W, &axy->H) == 4) {
+                // Success without comma
+            } else {
+                // Debug output
+                logmsg("Debug: pnmfile output after colon: '%s'\n", line);
                 ERROR("Failed to parse output from pnmfile: \"%s\"\n", line);
                 exit(-1);
             }
@@ -823,14 +836,59 @@ int augment_xylist(augment_xylist_t* axy,
             if (pnmtype == 'P') {
                 logverb("Converting PPM image to FITS...\n");
 
-                sl_append(cmd, "ppmtopgm");
+#ifdef _WIN32
+                // Windows: use two separate commands instead of pipe
+                char* pgmfn = create_temp_file("pgm", axy->tempdir);
+                sl_append_nocopy(tempfiles, pgmfn);
+
+                // First: convert PPM to PGM
+                append_executable(cmd, "ppmtopgm", me);
+                append_escape(cmd, pnmfn);
+                sl_append(cmd, ">");
+                append_escape(cmd, pgmfn);
+
+                char* cmdstr = sl_implode(cmd, " ");
+                char full_cmd[4096];
+                snprintf(full_cmd, sizeof(full_cmd), "cmd /c \"%s\"", cmdstr);
+                logverb("Running: %s\n", full_cmd);
+                int result1 = system(full_cmd);
+                free(cmdstr);
+                if (result1 != 0) {
+                    ERROR("Failed to run ppmtopgm command");
+                    exit(-1);
+                }
+
+                // Second: convert PGM to FITS
+                sl_free2(cmd);
+                cmd = sl_new(16);
+                append_executable(cmd, "an-pnmtofits", me);
+                append_escape(cmd, pgmfn);
+                sl_append(cmd, ">");
+                append_escape(cmd, fitsimgfn);
+
+                cmdstr = sl_implode(cmd, " ");
+                snprintf(full_cmd, sizeof(full_cmd), "cmd /c \"%s\"", cmdstr);
+                logverb("Running: %s\n", full_cmd);
+                int result2 = system(full_cmd);
+                free(cmdstr);
+                if (result2 != 0) {
+                    ERROR("Failed to run an-pnmtofits command");
+                    exit(-1);
+                }
+
+                // Clear cmd for next use
+                sl_free2(cmd);
+                cmd = sl_new(16);
+#else
+                // Unix: use pipe
+                append_executable(cmd, "ppmtopgm", me);
                 append_escape(cmd, pnmfn);
                 sl_append(cmd, "|");
                 append_executable(cmd, "an-pnmtofits", me);
                 sl_append(cmd, ">");
                 append_escape(cmd, fitsimgfn);
-
                 run(cmd, verbose);
+#endif
 
             } else if (pnmtype == 'G') {
                 logverb("Converting PGM image to FITS...\n");
@@ -845,13 +903,59 @@ int augment_xylist(augment_xylist_t* axy,
             } else if (pnmtype == 'B') {
                 logverb("Converting PBM image to FITS...\n");
 
-                sl_append(cmd, "pbmtopgm 3 3");
+#ifdef _WIN32
+                // Windows: use two separate commands instead of pipe
+                char* pgmfn = create_temp_file("pgm", axy->tempdir);
+                sl_append_nocopy(tempfiles, pgmfn);
+
+                // First: convert PBM to PGM
+                append_executable(cmd, "pbmtopgm", me);
+                sl_append(cmd, "3");
+                sl_append(cmd, "3");
+                append_escape(cmd, pnmfn);
+                sl_append(cmd, ">");
+                append_escape(cmd, pgmfn);
+
+                char* cmdstr = sl_implode(cmd, " ");
+                char full_cmd[4096];
+                snprintf(full_cmd, sizeof(full_cmd), "cmd /c \"%s\"", cmdstr);
+                logverb("Running: %s\n", full_cmd);
+                int result1 = system(full_cmd);
+                free(cmdstr);
+                if (result1 != 0) {
+                    ERROR("Failed to run pbmtopgm command");
+                    exit(-1);
+                }
+
+                // Second: convert PGM to FITS
+                sl_free2(cmd);
+                cmd = sl_new(16);
+                append_executable(cmd, "an-pnmtofits", me);
+                append_escape(cmd, pgmfn);
+                sl_append(cmd, ">");
+                append_escape(cmd, fitsimgfn);
+
+                cmdstr = sl_implode(cmd, " ");
+                snprintf(full_cmd, sizeof(full_cmd), "cmd /c \"%s\"", cmdstr);
+                logverb("Running: %s\n", full_cmd);
+                int result2 = system(full_cmd);
+                free(cmdstr);
+                if (result2 != 0) {
+                    ERROR("Failed to run an-pnmtofits command");
+                    exit(-1);
+                }
+#else
+                // Unix: use pipe
+                append_executable(cmd, "pbmtopgm", me);
+                sl_append(cmd, "3");
+                sl_append(cmd, "3");
                 append_escape(cmd, pnmfn);
                 sl_append(cmd, "|");
                 append_executable(cmd, "an-pnmtofits", me);
                 sl_append(cmd, ">");
                 append_escape(cmd, fitsimgfn);
                 run(cmd, verbose);
+#endif
             } else {
                 assert(0);
             }
