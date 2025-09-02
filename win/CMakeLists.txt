@@ -331,8 +331,66 @@ add_custom_target(copy_dlls ALL
     COMMAND ${CMAKE_COMMAND} -E copy_if_different 
         "C:/msys64/mingw64/bin/libwinpthread-1.dll" 
         ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different 
-        "C:/msys64/mingw64/bin/libcfitsio-10.dll" 
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libcfitsio-10.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libgsl-28.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libsystre-0.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libcurl-4.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libintl-8.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libtre-5.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libbrotlidec.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libbrotlicommon.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libiconv-2.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libidn2-0.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    # 添加更多可能缺失的DLL
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libssl-3-x64.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libcrypto-3-x64.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libnghttp2-14.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libpsl-5.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libunistring-5.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libzstd.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libssh2-1.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libnghttp3-9.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libngtcp2-16.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libngtcp2_crypto_ossl-0.dll"
         ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
     COMMENT "Copying DLL dependencies"
 )
