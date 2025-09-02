@@ -11,7 +11,9 @@
 #include <stdint.h>
 #include <limits.h>
 #include <sys/time.h>
+#ifndef _WIN32
 #include <sys/resource.h>
+#endif
 #include <assert.h>
 
 #include "healpix.h"
@@ -27,6 +29,7 @@
 #include "bt.h"
 #include "starkd.h"
 #include "boilerplate.h"
+#include "os-features-config.h"
 #include "log.h"
 #include "errors.h"
 #include "quad-utils.h"

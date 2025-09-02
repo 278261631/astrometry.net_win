@@ -3,8 +3,12 @@
  # Licensed under a 3-clause BSD style license - see LICENSE
  */
 
+#ifndef _WIN32
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#else
+#include <winsock2.h>
+#endif
 #include <assert.h>
 #include <stdio.h>
 #include <stdint.h>

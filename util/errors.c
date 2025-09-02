@@ -228,10 +228,28 @@ void errors_regex_error(int errcode, const regex_t* re) {
 
 void error_stack_add_entryv(err_t* e, const char* file, int line, const char* func, const char* format, va_list va) {
     char* str;
+#ifdef _WIN32
+    int len = _vscprintf(format, va);
+    if (len == -1) {
+        fprintf(stderr, "_vscprintf failed with format string: \"%s\"\n", format);
+        return;
+    }
+    str = malloc(len + 1);
+    if (!str) {
+        fprintf(stderr, "malloc failed for error message\n");
+        return;
+    }
+    if (vsprintf(str, format, va) == -1) {
+        fprintf(stderr, "vsprintf failed with format string: \"%s\"\n", format);
+        free(str);
+        return;
+    }
+#else
     if (vasprintf(&str, format, va) == -1) {
         fprintf(stderr, "vasprintf failed with format string: \"%s\"\n", format);
         return;
     }
+#endif
     error_stack_add_entry(e, file, line, func, str);
     free(str);
 }

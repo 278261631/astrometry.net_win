@@ -33,11 +33,42 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifndef _WIN32
 #include <pwd.h>
 #include <unistd.h>
 #include <sys/time.h>
+#else
+#include <windows.h>
+#include <io.h>
+#endif
 
 #include "qfits_time.h"
+
+#ifdef _WIN32
+struct timeval {
+    long tv_sec;
+    long tv_usec;
+};
+
+static int gettimeofday(struct timeval *tv, void *tz) {
+    FILETIME ft;
+    unsigned __int64 tmpres = 0;
+    static int tzflag = 0;
+
+    if (NULL != tv) {
+        GetSystemTimeAsFileTime(&ft);
+        tmpres |= ft.dwHighDateTime;
+        tmpres <<= 32;
+        tmpres |= ft.dwLowDateTime;
+        tmpres /= 10;  /*convert into microseconds*/
+        /*converting file time to unix epoch*/
+        tmpres -= 11644473600000000ULL;
+        tv->tv_sec = (long)(tmpres / 1000000UL);
+        tv->tv_usec = (long)(tmpres % 1000000UL);
+    }
+    return 0;
+}
+#endif
 
 /*-----------------------------------------------------------------------------
                                    Macros
@@ -192,7 +223,11 @@ static long timer_to_date(time_t time_secs)
         return 0;
     } else {
         /*  Convert into a long value CCYYMMDD */
+#ifdef _WIN32
+        if (localtime_s(&time_struct, &time_secs) == 0) {
+#else
         if (localtime_r (&time_secs, &time_struct)) {
+#endif
             time_struct.tm_year += 1900;
             return (MAKE_DATE ( time_struct.tm_year / 100,
                                 time_struct.tm_year % 100,
@@ -225,7 +260,11 @@ static long timer_to_time(time_t time_secs)
         return 0;
     } else {
         /*  Convert into a long value HHMMSS00 */
+#ifdef _WIN32
+        if (localtime_s(&time_struct, &time_secs) == 0) {
+#else
         if (localtime_r (&time_secs, &time_struct)) {
+#endif
             return (MAKE_TIME (time_struct.tm_hour,
                                time_struct.tm_min,
                                time_struct.tm_sec,

@@ -8,6 +8,15 @@
 #include <string.h>
 #include <assert.h>
 
+#ifdef _WIN32
+/* Windows defines ERROR macro, undefine it to avoid conflicts */
+#ifdef ERROR
+#undef ERROR
+#endif
+/* Define uint type for Windows */
+typedef unsigned int uint;
+#endif
+
 #include "quadfile.h"
 #include "qfits_header.h"
 #include "fitsioutils.h"
@@ -15,6 +24,14 @@
 #include "ioutils.h"
 #include "errors.h"
 #include "an-endian.h"
+
+#ifdef _WIN32
+/* Windows redefines ERROR macro after including headers, undefine it and redefine correctly */
+#ifdef ERROR
+#undef ERROR
+#endif
+#define ERROR(fmt, ...) report_error(__FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
+#endif
 
 #define CHUNK_QUADS 0
 

@@ -1210,8 +1210,21 @@ char* sl_appendf(sl* list, const char* format, ...) {
 
 char* sl_appendvf(sl* list, const char* format, va_list va) {
     char* str;
+#ifdef _WIN32
+    int len = _vscprintf(format, va);
+    if (len == -1)
+        return NULL;
+    str = malloc(len + 1);
+    if (!str)
+        return NULL;
+    if (vsprintf(str, format, va) == -1) {
+        free(str);
+        return NULL;
+    }
+#else
     if (vasprintf(&str, format, va) == -1)
         return NULL;
+#endif
     sl_append_nocopy(list, str);
     return str;
 }
@@ -1220,8 +1233,28 @@ char* sl_insert_sortedf(sl* list, const char* format, ...) {
     va_list lst;
     char* str;
     va_start(lst, format);
-    if (vasprintf(&str, format, lst) == -1)
+#ifdef _WIN32
+    int len = _vscprintf(format, lst);
+    if (len == -1) {
+        va_end(lst);
         return NULL;
+    }
+    str = malloc(len + 1);
+    if (!str) {
+        va_end(lst);
+        return NULL;
+    }
+    if (vsprintf(str, format, lst) == -1) {
+        free(str);
+        va_end(lst);
+        return NULL;
+    }
+#else
+    if (vasprintf(&str, format, lst) == -1) {
+        va_end(lst);
+        return NULL;
+    }
+#endif
     sl_insert_sorted_nocopy(list, str);
     va_end(lst);
     return str;
@@ -1231,8 +1264,28 @@ char* sl_insertf(sl* list, size_t index, const char* format, ...) {
     va_list lst;
     char* str;
     va_start(lst, format);
-    if (vasprintf(&str, format, lst) == -1)
+#ifdef _WIN32
+    int len = _vscprintf(format, lst);
+    if (len == -1) {
+        va_end(lst);
         return NULL;
+    }
+    str = malloc(len + 1);
+    if (!str) {
+        va_end(lst);
+        return NULL;
+    }
+    if (vsprintf(str, format, lst) == -1) {
+        free(str);
+        va_end(lst);
+        return NULL;
+    }
+#else
+    if (vasprintf(&str, format, lst) == -1) {
+        va_end(lst);
+        return NULL;
+    }
+#endif
     sl_insert_nocopy(list, index, str);
     va_end(lst);
     return str;

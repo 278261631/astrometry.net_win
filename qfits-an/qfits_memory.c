@@ -35,16 +35,39 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <unistd.h>
+#include <sys/resource.h>
+#include <sys/mman.h>
+#else
+#include "mman.h"
+#include <windows.h>
+#include <io.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/resource.h>
 #include <errno.h>
 #include <assert.h>
 
 #include "qfits_error.h"
+
+#ifdef _WIN32
+static int getpagesize(void) {
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    return si.dwPageSize;
+}
+
+static int fchmod(int fd, mode_t mode) {
+    /* Windows doesn't have fchmod, just return success */
+    return 0;
+}
+
+static int getpid(void) {
+    return GetCurrentProcessId();
+}
+#endif
 
 /*-----------------------------------------------------------------------------
                                 Defines
@@ -1320,7 +1343,9 @@ static unsigned qfits_memory_hash(const char * key)
 /*----------------------------------------------------------------------------*/
 static void qfits_memory_init(void)
 {
+#ifndef _WIN32
     struct rlimit rlim;
+#endif
 
     qfits_mem_debug(
         fprintf(stderr,
@@ -1333,7 +1358,8 @@ static void qfits_memory_init(void)
 
     /* Install cleanup routine at exit */
     atexit(qfits_memory_cleanup);
-        
+
+#ifndef _WIN32
     /* Increase number of descriptors to maximum */
     getrlimit(RLIMIT_NOFILE, &rlim);
     qfits_mem_debug(
@@ -1343,6 +1369,7 @@ static void qfits_memory_init(void)
     );
     rlim.rlim_cur = rlim.rlim_max;
     setrlimit(RLIMIT_NOFILE, &rlim);
+#endif
 
 #ifdef __linux__
     /* Get RLIMIT_DATA on Linux */

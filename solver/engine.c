@@ -15,10 +15,17 @@
 #include <ctype.h>
 #include <errno.h>
 #include <sys/types.h>
+#ifndef _WIN32
 #include <sys/wait.h>
 #include <libgen.h>
 #include <getopt.h>
 #include <dirent.h>
+#include <unistd.h>
+#else
+#include <windows.h>
+#include <process.h>
+#include <direct.h>
+#endif
 #include <assert.h>
 
 #include "math.h"
@@ -36,6 +43,68 @@
 #include "log.h"
 #include "anqfits.h"
 #include "errors.h"
+
+#ifdef _WIN32
+/* Windows redefines ERROR macro after including headers, undefine it and redefine correctly */
+#ifdef ERROR
+#undef ERROR
+#endif
+#define ERROR(fmt, ...) report_error(__FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
+
+/* Windows directory operations compatibility */
+typedef struct {
+    HANDLE handle;
+    WIN32_FIND_DATA findData;
+    int first;
+} DIR;
+
+struct dirent {
+    char d_name[MAX_PATH];
+};
+
+static DIR* opendir(const char* path) {
+    DIR* dir = malloc(sizeof(DIR));
+    if (!dir) return NULL;
+
+    char searchPath[MAX_PATH];
+    snprintf(searchPath, sizeof(searchPath), "%s\\*", path);
+
+    dir->handle = FindFirstFile(searchPath, &dir->findData);
+    if (dir->handle == INVALID_HANDLE_VALUE) {
+        free(dir);
+        return NULL;
+    }
+    dir->first = 1;
+    return dir;
+}
+
+static struct dirent* readdir(DIR* dir) {
+    static struct dirent entry;
+
+    if (!dir || dir->handle == INVALID_HANDLE_VALUE) return NULL;
+
+    if (dir->first) {
+        dir->first = 0;
+    } else {
+        if (!FindNextFile(dir->handle, &dir->findData)) {
+            return NULL;
+        }
+    }
+
+    strncpy(entry.d_name, dir->findData.cFileName, sizeof(entry.d_name) - 1);
+    entry.d_name[sizeof(entry.d_name) - 1] = '\0';
+    return &entry;
+}
+
+static int closedir(DIR* dir) {
+    if (!dir) return -1;
+    if (dir->handle != INVALID_HANDLE_VALUE) {
+        FindClose(dir->handle);
+    }
+    free(dir);
+    return 0;
+}
+#endif
 #include "engine.h"
 #include "tic.h"
 #include "healpix.h"

@@ -17,6 +17,7 @@
 #include "anqfits.h"
 #include "starkd.h"
 #include "boilerplate.h"
+#include "os-features-config.h"
 #include "log.h"
 #include "errors.h"
 

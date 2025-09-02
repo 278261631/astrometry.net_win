@@ -10,11 +10,28 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifdef _WIN32
+#include "mman.h"
+#else
 #include <sys/mman.h>
+#endif
 #include <fcntl.h>
 
 #include "solvedfile.h"
 #include "errors.h"
+
+#ifdef _WIN32
+/* Windows redefines ERROR macro after including headers, undefine it and redefine correctly */
+#ifdef ERROR
+#undef ERROR
+#endif
+#define ERROR(fmt, ...) report_error(__FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
+
+/* Windows doesn't have O_SYNC, use 0 as fallback */
+#ifndef O_SYNC
+#define O_SYNC 0
+#endif
+#endif
 
 #if defined(__APPLE__)
 // MacOS 10.3 with gcc 3.3 doesn't have O_SYNC.

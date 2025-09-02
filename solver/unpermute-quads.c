@@ -18,6 +18,7 @@
 #include "log.h"
 #include "errors.h"
 #include "boilerplate.h"
+#include "os-features-config.h"
 
 int unpermute_quads(quadfile_t* quadin, codetree_t* treein,
                     quadfile_t* quadout, codetree_t** p_treeout,

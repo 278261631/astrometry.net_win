@@ -11,10 +11,17 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #include <assert.h>
 #include <errno.h>
+#ifdef _WIN32
+#include "mman.h"
+#include <windows.h>
+#else
 #include <sys/mman.h>
+#endif
 
 #include "anqfits.h"
 #include "qfits_std.h"
@@ -28,6 +35,14 @@
 #include "qfits_image.h"
 #include "qfits_convert.h"
 #include "qfits_byteswap.h"
+
+#ifdef _WIN32
+static int getpagesize(void) {
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    return si.dwPageSize;
+}
+#endif
 
 #include "ioutils.h"
 #include "errors.h"

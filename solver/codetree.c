@@ -21,6 +21,7 @@
 #include "fitsioutils.h"
 #include "codekd.h"
 #include "boilerplate.h"
+#include "os-features-config.h"
 #include "errors.h"
 #include "log.h"
 

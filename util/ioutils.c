@@ -9,13 +9,22 @@
 #include <stdint.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <fcntl.h>
+#ifndef _WIN32
 #include <sys/wait.h>
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/select.h>
-#include <fcntl.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <unistd.h>
+#else
+#include <winsock2.h>
+#include <windows.h>
+#include <io.h>
+#include <direct.h>
+#include <process.h>
+#endif
 #include <stdlib.h>
 #include <signal.h>
 #include <assert.h>
@@ -29,6 +38,40 @@
 #include "ioutils.h"
 #include "errors.h"
 #include "log.h"
+
+#ifdef _WIN32
+/* Windows compatibility functions */
+static int getpagesize(void) {
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    return si.dwPageSize;
+}
+
+static int vasprintf(char **strp, const char *format, va_list ap) {
+    int len = _vscprintf(format, ap);
+    if (len == -1) return -1;
+    *strp = malloc(len + 1);
+    if (!*strp) return -1;
+    return vsprintf(*strp, format, ap);
+}
+
+static struct tm* gmtime_r(const time_t *timep, struct tm *result) {
+    return gmtime_s(result, timep) == 0 ? result : NULL;
+}
+
+static struct tm* localtime_r(const time_t *timep, struct tm *result) {
+    return localtime_s(result, timep) == 0 ? result : NULL;
+}
+
+static char* mkdtemp(char *template) {
+    /* Simple Windows implementation */
+    if (_mktemp(template) == NULL) return NULL;
+    if (_mkdir(template) != 0) return NULL;
+    return template;
+}
+
+#define S_ISLNK(m) 0  /* Windows doesn't have symbolic links in the same way */
+#endif
 
 uint32_t ENDIAN_DETECTOR = 0x01020304;
 
@@ -221,6 +264,24 @@ char* find_file_in_dirs(const char** dirs, int ndirs, const char* filename, anbo
 }
 
 float get_cpu_usage() {
+#ifdef _WIN32
+    /* Windows implementation using GetProcessTimes */
+    HANDLE process = GetCurrentProcess();
+    FILETIME creation, exit, kernel, user;
+    ULARGE_INTEGER kernel_time, user_time;
+
+    if (!GetProcessTimes(process, &creation, &exit, &kernel, &user)) {
+        return -1.0;
+    }
+
+    kernel_time.LowPart = kernel.dwLowDateTime;
+    kernel_time.HighPart = kernel.dwHighDateTime;
+    user_time.LowPart = user.dwLowDateTime;
+    user_time.HighPart = user.dwHighDateTime;
+
+    /* Convert from 100-nanosecond intervals to seconds */
+    return (float)((kernel_time.QuadPart + user_time.QuadPart) / 10000000.0);
+#else
     struct rusage r;
     float sofar;
     if (getrusage(RUSAGE_SELF, &r)) {
@@ -230,6 +291,7 @@ float get_cpu_usage() {
     sofar = (float)(r.ru_utime.tv_sec + r.ru_stime.tv_sec) +
         (1e-6 * (r.ru_utime.tv_usec + r.ru_stime.tv_usec));
     return sofar;
+#endif
 }
 
 anbool streq(const char* s1, const char* s2) {
@@ -391,6 +453,22 @@ static int readfd(int fd, char* buf, int NB, char** pcursor,
 }
 
 int run_command_get_outputs(const char* cmd, sl** outlines, sl** errlines) {
+#ifdef _WIN32
+    /* Simplified Windows implementation using system() */
+    /* This is a basic implementation - for full functionality, would need CreateProcess */
+    int result = system(cmd);
+
+    if (outlines) {
+        *outlines = sl_new(1);
+        sl_append(*outlines, "Output capture not implemented on Windows");
+    }
+    if (errlines) {
+        *errlines = sl_new(1);
+        sl_append(*errlines, "Error capture not implemented on Windows");
+    }
+
+    return result;
+#else
     int outpipe[2];
     int errpipe[2];
     pid_t pid;
@@ -579,8 +657,9 @@ int run_command_get_outputs(const char* cmd, sl** outlines, sl** errlines) {
             close(errpipe[0]);
         return rtn;
     }
-    
+
     return 0;
+#endif
 }
 
 int mkdir_p(const char* dirpath) {
@@ -596,7 +675,11 @@ int mkdir_p(const char* dirpath) {
     free(path);
     while (sl_size(tomake)) {
         char* path = sl_pop(tomake);
+#ifdef _WIN32
+        if (mkdir(path)) {
+#else
         if (mkdir(path, 0777)) {
+#endif
             SYSERROR("Failed to mkdir(%s)", path);
             sl_free2(tomake);
             free(path);
@@ -882,6 +965,7 @@ char* strdup_safe(const char* str) {
     return rtn;
 }
 
+#ifndef _WIN32
 static int oldsigbus_valid = 0;
 static struct sigaction oldsigbus;
 static void sigbus_handler(int sig) {
@@ -913,6 +997,16 @@ void reset_sigbus_mmap_warning() {
         }
     }
 }
+#else
+/* Windows stubs - no SIGBUS handling needed */
+void add_sigbus_mmap_warning() {
+    /* No-op on Windows */
+}
+
+void reset_sigbus_mmap_warning() {
+    /* No-op on Windows */
+}
+#endif
 
 int is_word(const char* cmdline, const char* keyword, char** cptr) {
     int len = strlen(keyword);

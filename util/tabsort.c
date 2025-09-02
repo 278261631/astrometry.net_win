@@ -8,7 +8,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
+#ifdef _WIN32
+#include "mman.h"
+#else
 #include <sys/mman.h>
+#endif
 
 #include "anqfits.h"
 #include "ioutils.h"

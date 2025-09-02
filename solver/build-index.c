@@ -11,7 +11,9 @@
 #include <stdint.h>
 #include <limits.h>
 #include <sys/time.h>
+#ifndef _WIN32
 #include <sys/resource.h>
+#endif
 #include <assert.h>
 
 #include "os-features.h"

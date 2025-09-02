@@ -35,11 +35,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#ifdef _WIN32
+#include "mman.h"
+#include <windows.h>
+#include <io.h>
+#else
 #include <sys/mman.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 #include <unistd.h>
 #include <regex.h>
+#endif
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "qfits_config.h"
 #include "qfits_tools.h"
@@ -158,6 +164,24 @@ int qfits_is_boolean(const char * s)
 /*----------------------------------------------------------------------------*/
 int qfits_is_int(const char * s)
 {
+#ifdef _WIN32
+    /* Simple Windows implementation without regex */
+    char *endptr;
+    if (s==NULL) return 0;
+    if (s[0]==0) return 0;
+
+    /* Skip leading whitespace and sign */
+    while (*s == ' ' || *s == '\t') s++;
+    if (*s == '+' || *s == '-') s++;
+
+    /* Check if all remaining characters are digits */
+    if (*s == 0) return 0; /* No digits after sign */
+    while (*s) {
+        if (*s < '0' || *s > '9') return 0;
+        s++;
+    }
+    return 1;
+#else
     regex_t re_int;
     int     status;
 
@@ -168,8 +192,9 @@ int qfits_is_int(const char * s)
         exit(-1);
     }
     status = regexec(&re_int, s, 0, NULL, 0);
-    regfree(&re_int); 
+    regfree(&re_int);
     return (status) ? 0 : 1;
+#endif
 }
 
 /*----------------------------------------------------------------------------*/
@@ -183,6 +208,18 @@ int qfits_is_int(const char * s)
 /*----------------------------------------------------------------------------*/
 int qfits_is_float(const char * s)
 {
+#ifdef _WIN32
+    /* Simple Windows implementation without regex */
+    char *endptr;
+    if (s==NULL) return 0;
+    if (s[0]==0) return 0;
+
+    /* Try to parse as double */
+    strtod(s, &endptr);
+    /* If endptr points to end of string, it's a valid float */
+    while (*endptr == ' ' || *endptr == '\t') endptr++; /* Skip trailing whitespace */
+    return (*endptr == '\0');
+#else
     regex_t re_float;
     int     status;
 
@@ -193,8 +230,9 @@ int qfits_is_float(const char * s)
         exit(-1);
     }
     status = regexec(&re_float, s, 0, NULL, 0);
-    regfree(&re_float); 
+    regfree(&re_float);
     return (status) ? 0 : 1;
+#endif
 }
 
 /*----------------------------------------------------------------------------*/
@@ -208,6 +246,29 @@ int qfits_is_float(const char * s)
 /*----------------------------------------------------------------------------*/
 int qfits_is_complex(const char * s)
 {
+#ifdef _WIN32
+    /* Simple Windows implementation without regex */
+    char *space_pos, *endptr;
+    if (s==NULL) return 0;
+    if (s[0]==0) return 0;
+
+    /* Look for space separator between real and imaginary parts */
+    space_pos = strchr(s, ' ');
+    if (space_pos == NULL) return 0;
+
+    /* Check if first part is a valid float */
+    strtod(s, &endptr);
+    if (endptr != space_pos) return 0;
+
+    /* Skip spaces */
+    space_pos++;
+    while (*space_pos == ' ' || *space_pos == '\t') space_pos++;
+
+    /* Check if second part is a valid float */
+    strtod(space_pos, &endptr);
+    while (*endptr == ' ' || *endptr == '\t') endptr++;
+    return (*endptr == '\0');
+#else
     regex_t re_cmp;
     int     status;
 
@@ -218,8 +279,9 @@ int qfits_is_complex(const char * s)
         exit(-1);
     }
     status = regexec(&re_cmp, s, 0, NULL, 0);
-    regfree(&re_cmp); 
+    regfree(&re_cmp);
     return (status) ? 0 : 1;
+#endif
 }
 
 /*----------------------------------------------------------------------------*/

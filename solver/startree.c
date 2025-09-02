@@ -11,6 +11,7 @@
 #include "an-bool.h"
 #include "fitsioutils.h"
 #include "boilerplate.h"
+#include "os-features-config.h"
 #include "fitstable.h"
 
 anbool startree_has_tagalong_data(const fitstable_t* intab) {

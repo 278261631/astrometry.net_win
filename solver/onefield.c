@@ -12,7 +12,9 @@
 
 #include <sys/types.h>
 #include <sys/time.h>
+#ifndef _WIN32
 #include <sys/resource.h>
+#endif
 #include <libgen.h>
 #include <unistd.h>
 #include <stdio.h>

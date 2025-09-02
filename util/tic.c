@@ -4,15 +4,55 @@
  */
 
 #include <time.h>
-#include <sys/time.h>
-#include <sys/resource.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 #include <stdint.h>
+#ifndef _WIN32
+#include <sys/time.h>
+#include <sys/resource.h>
+#include <unistd.h>
+#else
+#include <windows.h>
+#endif
 
 #include "tic.h"
 #include "errors.h"
+
+#ifdef _WIN32
+struct rusage {
+    struct timeval ru_utime;
+    struct timeval ru_stime;
+    long ru_maxrss;
+};
+
+static int getrusage(int who, struct rusage *usage) {
+    HANDLE process = GetCurrentProcess();
+    FILETIME creation, exit, kernel, user;
+    ULARGE_INTEGER kernel_time, user_time;
+
+    if (!GetProcessTimes(process, &creation, &exit, &kernel, &user)) {
+        return -1;
+    }
+
+    kernel_time.LowPart = kernel.dwLowDateTime;
+    kernel_time.HighPart = kernel.dwHighDateTime;
+    user_time.LowPart = user.dwLowDateTime;
+    user_time.HighPart = user.dwHighDateTime;
+
+    /* Convert from 100-nanosecond intervals to microseconds */
+    usage->ru_stime.tv_sec = (long)(kernel_time.QuadPart / 10000000ULL);
+    usage->ru_stime.tv_usec = (long)((kernel_time.QuadPart % 10000000ULL) / 10);
+    usage->ru_utime.tv_sec = (long)(user_time.QuadPart / 10000000ULL);
+    usage->ru_utime.tv_usec = (long)((user_time.QuadPart % 10000000ULL) / 10);
+
+    /* Windows doesn't provide RSS info easily, set to 0 */
+    usage->ru_maxrss = 0;
+
+    return 0;
+}
+
+#define RUSAGE_SELF 0
+#endif
 #include "log.h"
 
 static time_t starttime;

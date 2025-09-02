@@ -16,6 +16,14 @@
 #include "an-endian.h"
 #include "anqfits.h"
 
+#ifdef _WIN32
+/* Windows redefines ERROR macro after including headers, undefine it and redefine correctly */
+#ifdef ERROR
+#undef ERROR
+#endif
+#define ERROR(fmt, ...) report_error(__FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
+#endif
+
 #include "log.h"
 
 struct fitscol_t {

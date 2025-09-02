@@ -6,7 +6,11 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <sys/types.h>
+#ifdef _WIN32
+#include "mman.h"
+#else
 #include <sys/mman.h>
+#endif
 #include <string.h>
 #include <assert.h>
 

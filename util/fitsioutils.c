@@ -389,7 +389,23 @@ void fits_header_addf_longstring(qfits_header* hdr, const char* key,
     int commentlen;
     
     va_start(lst, format);
+#ifdef _WIN32
+    nb = _vscprintf(format, lst);
+    if (nb == -1) {
+        va_end(lst);
+        SYSERROR("_vscprintf failed.");
+        return;
+    }
+    str = malloc(nb + 1);
+    if (!str) {
+        va_end(lst);
+        SYSERROR("malloc failed.");
+        return;
+    }
+    nb = vsprintf(str, format, lst);
+#else
     nb = vasprintf(&str, format, lst);
+#endif
     va_end(lst);
     if (nb == -1) {
         SYSERROR("vasprintf failed.");
@@ -695,11 +711,25 @@ static int add_long_line(qfits_header* hdr, const char* keyword, const char* ind
     char* str = NULL;
     int len;
     int indlen = (indent ? strlen(indent) : 0);
+#ifdef _WIN32
+    len = _vscprintf(format, lst);
+    if (len == -1) {
+        fprintf(stderr, "_vscprintf failed: %s\n", strerror(errno));
+        return -1;
+    }
+    origstr = malloc(len + 1);
+    if (!origstr) {
+        fprintf(stderr, "malloc failed: %s\n", strerror(errno));
+        return -1;
+    }
+    len = vsprintf(origstr, format, lst);
+#else
     len = vasprintf(&origstr, format, lst);
     if (len == -1) {
         fprintf(stderr, "vasprintf failed: %s\n", strerror(errno));
         return -1;
     }
+#endif
     str = origstr;
     do {
         char copy[80];
@@ -1054,7 +1084,7 @@ static void fits_init_endian_string() {
         uint32_t endian = ENDIAN_DETECTOR;
         unsigned char* cptr = (unsigned char*)&endian;
         fits_endian_string_inited = 1;
-        sprintf(fits_endian_string, "%02x:%02x:%02x:%02x", (uint)cptr[0], (uint)cptr[1], (uint)cptr[2], (uint)cptr[3]);
+        sprintf(fits_endian_string, "%02x:%02x:%02x:%02x", (unsigned int)cptr[0], (unsigned int)cptr[1], (unsigned int)cptr[2], (unsigned int)cptr[3]);
     }
 }
 
@@ -1174,7 +1204,7 @@ int fits_find_column(const qfits_table* table, const char* colname) {
 }
 
 void fits_add_uint_size(qfits_header* header) {
-    fits_header_add_int(header, "UINT_SZ", sizeof(uint), "sizeof(uint)");
+    fits_header_add_int(header, "UINT_SZ", sizeof(unsigned int), "sizeof(unsigned int)");
 }
 
 void fits_add_double_size(qfits_header* header) {
@@ -1184,9 +1214,9 @@ void fits_add_double_size(qfits_header* header) {
 int fits_check_uint_size(const qfits_header* header) {
     int uintsz;
     uintsz = qfits_header_getint(header, "UINT_SZ", -1);
-    if (sizeof(uint) != uintsz) {
-        fprintf(stderr, "File was written with sizeof(uint)=%i, but currently sizeof(uint)=%u.\n",
-                uintsz, (uint)sizeof(uint));
+    if (sizeof(unsigned int) != uintsz) {
+        fprintf(stderr, "File was written with sizeof(unsigned int)=%i, but currently sizeof(unsigned int)=%u.\n",
+                uintsz, (unsigned int)sizeof(unsigned int));
         return -1;
     }
     return 0;
@@ -1197,7 +1227,7 @@ int fits_check_double_size(const qfits_header* header) {
     doublesz = qfits_header_getint(header, "DUBL_SZ", -1);
     if (sizeof(double) != doublesz) {
         fprintf(stderr, "File was written with sizeof(double)=%i, but currently sizeof(double)=%u.\n",
-                doublesz, (uint)sizeof(double));
+                doublesz, (unsigned int)sizeof(double));
         return -1;
     }
     return 0;

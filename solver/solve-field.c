@@ -14,7 +14,9 @@
 #include <ctype.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifndef _WIN32
 #include <sys/wait.h>
+#endif
 #include <unistd.h>
 #include <libgen.h>
 #include <errors.h>
@@ -22,6 +24,15 @@
 #include <assert.h>
 
 #include "boilerplate.h"
+#include "os-features-config.h"
+
+#ifdef _WIN32
+/* Windows doesn't have these signal handling macros */
+#define WIFSIGNALED(status) 0
+#define WTERMSIG(status) 0
+#define WEXITSTATUS(status) (status)
+#define SIGTERM 15
+#endif
 #include "an-bool.h"
 #include "bl.h"
 #include "ioutils.h"
