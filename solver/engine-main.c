@@ -15,14 +15,22 @@
 #include <string.h>
 #include <ctype.h>
 #include <sys/types.h>
+#ifndef _WIN32
 #include <sys/wait.h>
 #include <sys/time.h>
-#include <time.h>
 #include <libgen.h>
 #include <getopt.h>
 #include <dirent.h>
-#include <assert.h>
 #include <glob.h>
+#include <unistd.h>
+#else
+#include <windows.h>
+#include <process.h>
+#include <direct.h>
+#include <io.h>
+#endif
+#include <time.h>
+#include <assert.h>
 
 // Some systems (Solaris) don't have these glob symbols.  Don't really need.
 #ifndef GLOB_BRACE
@@ -46,6 +54,128 @@
 #include "log.h"
 #include "errors.h"
 #include "engine.h"
+
+#ifdef _WIN32
+/* Windows redefines ERROR macro after including headers, undefine it and redefine correctly */
+#ifdef ERROR
+#undef ERROR
+#endif
+#define ERROR(fmt, ...) report_error(__FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
+/* Windows compatibility functions */
+typedef struct {
+    HANDLE handle;
+    WIN32_FIND_DATA findData;
+    int first;
+} DIR;
+
+struct dirent {
+    char d_name[MAX_PATH];
+};
+
+static DIR* opendir(const char* path) {
+    DIR* dir = malloc(sizeof(DIR));
+    if (!dir) return NULL;
+
+    char searchPath[MAX_PATH];
+    snprintf(searchPath, sizeof(searchPath), "%s\\*", path);
+
+    dir->handle = FindFirstFile(searchPath, &dir->findData);
+    if (dir->handle == INVALID_HANDLE_VALUE) {
+        free(dir);
+        return NULL;
+    }
+    dir->first = 1;
+    return dir;
+}
+
+static struct dirent* readdir(DIR* dir) {
+    static struct dirent entry;
+
+    if (!dir || dir->handle == INVALID_HANDLE_VALUE) return NULL;
+
+    if (dir->first) {
+        dir->first = 0;
+    } else {
+        if (!FindNextFile(dir->handle, &dir->findData)) {
+            return NULL;
+        }
+    }
+
+    strncpy(entry.d_name, dir->findData.cFileName, sizeof(entry.d_name) - 1);
+    entry.d_name[sizeof(entry.d_name) - 1] = '\0';
+    return &entry;
+}
+
+static int closedir(DIR* dir) {
+    if (!dir) return -1;
+    if (dir->handle != INVALID_HANDLE_VALUE) {
+        FindClose(dir->handle);
+    }
+    free(dir);
+    return 0;
+}
+
+/* Windows doesn't have glob, provide a simple implementation */
+typedef struct {
+    size_t gl_pathc;
+    char **gl_pathv;
+} glob_t;
+
+#define GLOB_ERR 1
+#define GLOB_NOSORT 2
+
+static int glob(const char *pattern, int flags, void *errfunc, glob_t *pglob) {
+    /* Simple implementation - just return the pattern as-is */
+    pglob->gl_pathc = 1;
+    pglob->gl_pathv = malloc(sizeof(char*));
+    pglob->gl_pathv[0] = strdup(pattern);
+    return 0;
+}
+
+static void globfree(glob_t *pglob) {
+    if (pglob->gl_pathv) {
+        for (size_t i = 0; i < pglob->gl_pathc; i++) {
+            free(pglob->gl_pathv[i]);
+        }
+        free(pglob->gl_pathv);
+    }
+}
+
+/* Windows signal handling stubs */
+#define WIFSIGNALED(status) 0
+#define WTERMSIG(status) 0
+#define WEXITSTATUS(status) (status)
+#define SIGTERM 15
+
+/* Windows doesn't have basename, provide simple implementation */
+static char* basename(char* path) {
+    char* base = strrchr(path, '\\');
+    if (!base) base = strrchr(path, '/');
+    return base ? base + 1 : path;
+}
+
+/* Windows dirname implementation */
+static char* dirname(char* path) {
+    char* last_slash = strrchr(path, '\\');
+    if (!last_slash) last_slash = strrchr(path, '/');
+    if (last_slash) {
+        *last_slash = '\0';
+        return path;
+    }
+    return ".";
+}
+
+/* getopt constants - may not be defined in some MinGW versions */
+#ifndef no_argument
+#define no_argument 0
+#endif
+#ifndef required_argument
+#define required_argument 1
+#endif
+#ifndef optional_argument
+#define optional_argument 2
+#endif
+#endif
 #include "an-opts.h"
 #include "gslutils.h"
 

@@ -924,7 +924,24 @@ anbool file_readable(const char* fn) {
 }
 
 anbool file_executable(const char* fn) {
-    return fn && (access(fn, X_OK) == 0);
+    if (!fn) return FALSE;
+
+#ifdef _WIN32
+    // On Windows, check if file exists and has .exe extension
+    // or just check if file exists (Windows doesn't use X_OK properly)
+    if (access(fn, F_OK) == 0) {
+        // File exists, check if it's a .exe file or just assume it's executable
+        const char* ext = strrchr(fn, '.');
+        if (ext && (strcasecmp(ext, ".exe") == 0 || strcasecmp(ext, ".bat") == 0 || strcasecmp(ext, ".cmd") == 0)) {
+            return TRUE;
+        }
+        // If no extension, assume it might be executable
+        return TRUE;
+    }
+    return FALSE;
+#else
+    return (access(fn, X_OK) == 0);
+#endif
 }
 
 anbool path_is_dir(const char* path) {

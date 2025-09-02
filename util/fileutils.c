@@ -31,7 +31,36 @@ char* find_executable(const char* progname, const char* sibling) {
     char* sibdir;
     char* path;
     char* pathenv;
+    char* progname_with_ext = NULL;
 
+#ifdef _WIN32
+    // On Windows, add .exe extension if not present
+    if (!strstr(progname, ".exe")) {
+        asprintf_safe(&progname_with_ext, "%s.exe", progname);
+        progname = progname_with_ext;
+    }
+
+    // If it's an absolute path, just return it.
+    if (progname[0] == '/' || (progname[1] == ':' && progname[0] != '\0'))
+        return strdup(progname);
+
+    // If it's a relative path, resolve it.
+    if (strchr(progname, '/') || strchr(progname, '\\')) {
+        path = an_canonicalize_file_name(progname);
+        if (path && file_executable(path)) {
+            if (progname_with_ext) free(progname_with_ext);
+            return path;
+        }
+        free(path);
+    }
+
+    // On Windows, if no path separators, check current directory first
+    if (file_executable(progname)) {
+        char* result = strdup(progname);
+        if (progname_with_ext) free(progname_with_ext);
+        return result;
+    }
+#else
     // If it's an absolute path, just return it.
     if (progname[0] == '/')
         return strdup(progname);
@@ -43,48 +72,76 @@ char* find_executable(const char* progname, const char* sibling) {
             return path;
         free(path);
     }
+#endif
 
-    // If "sibling" contains a "/", then check relative to it.
+    // If "sibling" contains a path separator, then check relative to it.
+#ifdef _WIN32
+    if (sibling && (strchr(sibling, '/') || strchr(sibling, '\\'))) {
+#else
     if (sibling && strchr(sibling, '/')) {
+#endif
         // dirname() overwrites its arguments, so make a copy...
         sib = strdup(sibling);
         sibdir = strdup(dirname(sib));
         free(sib);
 
+#ifdef _WIN32
+        asprintf_safe(&path, "%s\\%s", sibdir, progname);
+#else
         asprintf_safe(&path, "%s/%s", sibdir, progname);
+#endif
         free(sibdir);
 
-        if (file_executable(path))
+        if (file_executable(path)) {
+            if (progname_with_ext) free(progname_with_ext);
             return path;
+        }
 
         free(path);
     }
 
     // Search PATH.
     pathenv = getenv("PATH");
-    while (1) {
-        char* colon;
-        int len;
-        if (!strlen(pathenv))
-            break;
-        colon = strchr(pathenv, ':');
-        if (colon)
-            len = colon - pathenv;
-        else
-            len = strlen(pathenv);
-        if (pathenv[len - 1] == '/')
-            len--;
-        asprintf_safe(&path, "%.*s/%s", len, pathenv, progname);
-        if (file_executable(path))
-            return path;
-        free(path);
-        if (colon)
-            pathenv = colon + 1;
-        else
-            break;
+    if (pathenv) {
+        while (1) {
+            char* separator;
+            int len;
+            if (!strlen(pathenv))
+                break;
+#ifdef _WIN32
+            separator = strchr(pathenv, ';');
+#else
+            separator = strchr(pathenv, ':');
+#endif
+            if (separator)
+                len = separator - pathenv;
+            else
+                len = strlen(pathenv);
+#ifdef _WIN32
+            if (pathenv[len - 1] == '\\')
+#else
+            if (pathenv[len - 1] == '/')
+#endif
+                len--;
+#ifdef _WIN32
+            asprintf_safe(&path, "%.*s\\%s", len, pathenv, progname);
+#else
+            asprintf_safe(&path, "%.*s/%s", len, pathenv, progname);
+#endif
+            if (file_executable(path)) {
+                if (progname_with_ext) free(progname_with_ext);
+                return path;
+            }
+            free(path);
+            if (separator)
+                pathenv = separator + 1;
+            else
+                break;
+        }
     }
 
     // Not found.
+    if (progname_with_ext) free(progname_with_ext);
     return NULL;
 }
 

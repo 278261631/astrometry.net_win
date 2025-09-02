@@ -8,6 +8,12 @@ set(CMAKE_CXX_COMPILER "C:/msys64/mingw64/bin/g++.exe")
 # 设置CMAKE路径
 set(CMAKE_COMMAND "C:/CMake/bin/cmake.exe")
 
+# 添加GNU工具路径
+if(EXISTS "C:/GnuWin32/bin")
+    list(APPEND CMAKE_PROGRAM_PATH "C:/GnuWin32/bin")
+    message(STATUS "Added GNU Win32 tools path: C:/GnuWin32/bin")
+endif()
+
 # 设置Debug模式，禁用优化
 set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_C_FLAGS_DEBUG "-g -O0 -Wall")
@@ -288,6 +294,18 @@ endif()
 
 # 创建solve-field可执行文件
 add_executable(solve-field ../solver/solve-field.c)
+
+# 创建 astrometry-engine 可执行文件
+add_executable(astrometry-engine ../solver/engine-main.c)
+
+# 创建测试程序
+add_executable(test-find-executable test-find-executable.c)
+
+# 创建 an-fitstopnm 可执行文件
+add_executable(an-fitstopnm ../util/an-fitstopnm.c)
+
+# 创建 image2pnm 包装器可执行文件
+add_executable(image2pnm image2pnm.c)
 target_link_libraries(solve-field
     astrometry
     catalogs
@@ -297,6 +315,42 @@ target_link_libraries(solve-field
     qfits
     libkd
     ${CFITSIO_LIBRARIES}
+    m
+)
+
+# 链接 astrometry-engine
+target_link_libraries(astrometry-engine
+    astrometry
+    catalogs
+    anutils
+    anfiles
+    anbase
+    qfits
+    libkd
+    ${CFITSIO_LIBRARIES}
+    m
+)
+
+# 链接测试程序
+target_link_libraries(test-find-executable
+    anutils
+    anbase
+    qfits
+    ${CFITSIO_LIBRARIES}
+    m
+)
+
+# 链接 an-fitstopnm
+target_link_libraries(an-fitstopnm
+    anutils
+    anbase
+    qfits
+    ${CFITSIO_LIBRARIES}
+    m
+)
+
+# 链接 image2pnm (简单包装器，只需要基本库)
+target_link_libraries(image2pnm
     m
 )
 
@@ -315,10 +369,18 @@ target_compile_definitions(solve-field PRIVATE
 # 设置Windows特定的链接选项
 if(WIN32)
     target_link_libraries(solve-field ws2_32)
+    target_link_libraries(astrometry-engine ws2_32)
+    target_link_libraries(test-find-executable ws2_32)
+    target_link_libraries(an-fitstopnm ws2_32)
+    target_link_libraries(image2pnm ws2_32)
     # 尝试链接regex库
     find_library(REGEX_LIBRARY NAMES regex)
     if(REGEX_LIBRARY)
         target_link_libraries(solve-field ${REGEX_LIBRARY})
+        target_link_libraries(astrometry-engine ${REGEX_LIBRARY})
+        target_link_libraries(test-find-executable ${REGEX_LIBRARY})
+        target_link_libraries(an-fitstopnm ${REGEX_LIBRARY})
+        target_link_libraries(image2pnm ${REGEX_LIBRARY})
     endif()
 endif()
 
@@ -392,8 +454,12 @@ add_custom_target(copy_dlls ALL
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "C:/msys64/mingw64/bin/libngtcp2_crypto_ossl-0.dll"
         ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-    COMMENT "Copying DLL dependencies"
+    # Copy image2pnm batch wrapper
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/image2pnm.bat"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMENT "Copying DLL dependencies and scripts"
 )
 
-# 确保在构建solve-field后复制DLL
-add_dependencies(copy_dlls solve-field)
+# 确保在构建solve-field和astrometry-engine后复制DLL
+add_dependencies(copy_dlls solve-field astrometry-engine)

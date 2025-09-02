@@ -3,8 +3,13 @@
  # Licensed under a 3-clause BSD style license - see LICENSE
  */
 
+#ifndef _WIN32
 #include <arpa/inet.h>
 #include <unistd.h>
+#else
+#include <winsock2.h>
+#include <io.h>
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -20,6 +25,14 @@
 #include "errors.h"
 #include "fitsioutils.h"
 #include "mathutil.h"
+
+#ifdef _WIN32
+/* Windows redefines ERROR macro after including headers, undefine it and redefine correctly */
+#ifdef ERROR
+#undef ERROR
+#endif
+#define ERROR(fmt, ...) report_error(__FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
+#endif
 
 static const char* OPTIONS = "hi:o:Oe:p:m:IX:N:xnrsvML:H:";
 
@@ -68,8 +81,8 @@ static void sample_percentiles(const float* img, int nx, int ny, int margin,
         assert(i == np);
     } else {
         for (i=0; i<np; i++) {
-            x = margin + (nx - 2*margin) * ( (double)random() / (((double)RAND_MAX)+1.0) );
-            y = margin + (ny - 2*margin) * ( (double)random() / (((double)RAND_MAX)+1.0) );
+            x = margin + (nx - 2*margin) * ( (double)rand() / (((double)RAND_MAX)+1.0) );
+            y = margin + (ny - 2*margin) * ( (double)rand() / (((double)RAND_MAX)+1.0) );
             // On Solaris, apparently, random() / RAND_MAX can be a
             // huge number.  This should have no effect on other
             // machines.
