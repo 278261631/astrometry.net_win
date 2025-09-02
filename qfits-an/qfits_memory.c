@@ -536,8 +536,13 @@ void* qfits_memory_falloc2(
 	/* Memory-map input file */
 	// mmap requires page-aligned offsets.
 	get_mmap_size(offs, size, &mapstart, &maplen, &mapoff);
+#ifdef _WIN32
+	// On Windows, use PROT_READ only for files opened with O_RDONLY
+	ptr = (char*)mmap(0, maplen, PROT_READ, MAP_PRIVATE, fd, mapstart);
+#else
 	ptr = (char*)mmap(0, maplen, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd,
 					  mapstart);
+#endif
 	eno = errno;
         
 	/* Close file */
@@ -624,7 +629,12 @@ char * qfits_memory_falloc(
         }
 
         /* Memory-map input file */
+#ifdef _WIN32
+        // On Windows, use PROT_READ only for files opened with O_RDONLY
+        ptr = (char*)mmap(0, sta.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+#else
         ptr = (char*)mmap(0, sta.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+#endif
 		eno = errno;
         
         /* Close file */
@@ -731,7 +741,12 @@ char * qfits_memory_falloc(
     }
 
     /* Memory-map input file */
-    ptr = (char*)mmap(0, sta.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE,fd,0);
+#ifdef _WIN32
+    // On Windows, use PROT_READ only for files opened with O_RDONLY
+    ptr = (char*)mmap(0, sta.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+#else
+    ptr = (char*)mmap(0, sta.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+#endif
     
     /* Close file */
     close(fd);

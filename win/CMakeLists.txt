@@ -315,6 +315,9 @@ add_executable(removelines removelines.c)
 
 # 创建 uniformize 可执行文件
 add_executable(uniformize uniformize.c)
+
+# 创建 test_fits_read 测试程序
+add_executable(test_fits_read test_fits_read.c)
 target_link_libraries(solve-field
     astrometry
     catalogs
@@ -390,6 +393,18 @@ target_link_libraries(removelines
 target_link_libraries(uniformize
     anutils
     anbase
+    ws2_32
+    regex
+    m
+)
+
+# 链接 test_fits_read
+target_link_libraries(test_fits_read
+    anfiles
+    anutils
+    anbase
+    qfits
+    ${CFITSIO_LIBRARIES}
     ws2_32
     regex
     m
