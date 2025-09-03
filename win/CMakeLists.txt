@@ -18,6 +18,11 @@ endif()
 set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_C_FLAGS_DEBUG "-g -O0 -Wall")
 
+# 添加Git信息宏定义
+add_definitions(-DAN_GIT_URL="https://github.com/dstndstn/astrometry.net")
+add_definitions(-DAN_GIT_REVISION="Windows-Port")
+add_definitions(-DAN_GIT_DATE="2024-01-01")
+
 # 设置输出目录
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -44,6 +49,42 @@ pkg_check_modules(CFITSIO REQUIRED cfitsio)
 if(CFITSIO_FOUND)
     include_directories(${CFITSIO_INCLUDE_DIRS})
     link_directories(${CFITSIO_LIBRARY_DIRS})
+endif()
+
+# 查找 Cairo (用于绘图程序)
+pkg_check_modules(CAIRO cairo)
+if(CAIRO_FOUND)
+    message(STATUS "Cairo found: ${CAIRO_VERSION}")
+    include_directories(${CAIRO_INCLUDE_DIRS})
+    link_directories(${CAIRO_LIBRARY_DIRS})
+    set(HAVE_CAIRO TRUE)
+else()
+    message(STATUS "Cairo not found - plotting programs will be disabled")
+    set(HAVE_CAIRO FALSE)
+endif()
+
+# 查找 PNG 库
+pkg_check_modules(PNG libpng)
+if(PNG_FOUND)
+    message(STATUS "PNG found: ${PNG_VERSION}")
+    include_directories(${PNG_INCLUDE_DIRS})
+    link_directories(${PNG_LIBRARY_DIRS})
+    set(HAVE_PNG TRUE)
+else()
+    message(STATUS "PNG not found")
+    set(HAVE_PNG FALSE)
+endif()
+
+# 查找 JPEG 库
+pkg_check_modules(JPEG libjpeg)
+if(JPEG_FOUND)
+    message(STATUS "JPEG found: ${JPEG_VERSION}")
+    include_directories(${JPEG_INCLUDE_DIRS})
+    link_directories(${JPEG_LIBRARY_DIRS})
+    set(HAVE_JPEG TRUE)
+else()
+    message(STATUS "JPEG not found")
+    set(HAVE_JPEG FALSE)
 endif()
 
 # 查找GSL (如果系统有的话)
@@ -124,6 +165,9 @@ set(ANUTILS_SOURCES
     ../util/scamp.c
     ../util/tabsort.c
     ../util/anwcs.c
+    ../util/wcs-resample.c
+    ../util/qidxfile.c
+    ../util/healpix-utils.c
 )
 
 # util/anfiles 库
@@ -171,6 +215,24 @@ set(CATALOGS_SOURCES
     ../catalogs/openngc.c  # Now enabled - generated files available
     ../catalogs/stellarium-constellations.c
 )
+
+# 绘图相关源文件 (如果有Cairo的话)
+if(HAVE_CAIRO)
+    set(PLOT_SOURCES
+        ../plot/plotstuff.c
+        ../plot/plotfill.c
+        ../plot/plotxy.c
+        ../plot/plotimage.c
+        ../plot/plotannotations.c
+        ../plot/plotgrid.c
+        ../plot/plotoutline.c
+        ../plot/plotindex.c
+        ../plot/plotradec.c
+        ../plot/plothealpix.c
+        ../plot/plotmatch.c
+        ../util/cairoutils.c
+    )
+endif()
 
 # GSL库 (如果使用bundled版本)
 if(USE_BUNDLED_GSL)
@@ -271,6 +333,13 @@ add_library(anfiles STATIC ${ANFILES_SOURCES})
 add_library(libkd STATIC ${LIBKD_SOURCES})
 add_library(catalogs STATIC ${CATALOGS_SOURCES})
 
+# 创建 plot 库 (如果有Cairo的话)
+if(HAVE_CAIRO)
+    add_library(plot STATIC ${PLOT_SOURCES})
+    target_include_directories(plot PRIVATE ${CAIRO_INCLUDE_DIRS})
+    target_compile_definitions(plot PRIVATE ${CAIRO_CFLAGS_OTHER})
+endif()
+
 if(USE_BUNDLED_GSL)
     add_library(gsl-an STATIC ${GSL_SOURCES})
 endif()
@@ -318,6 +387,11 @@ add_executable(uniformize uniformize.c)
 
 # 创建 test_fits_read 测试程序
 add_executable(test_fits_read test_fits_read.c)
+
+# 创建绘图程序 (如果有Cairo的话)
+if(HAVE_CAIRO)
+    add_executable(plotxy ../plot/plotxy-main.c)
+endif()
 target_link_libraries(solve-field
     astrometry
     catalogs
@@ -409,6 +483,27 @@ target_link_libraries(test_fits_read
     regex
     m
 )
+
+# 链接绘图程序 (如果有Cairo的话)
+if(HAVE_CAIRO)
+    target_link_libraries(plotxy
+        plot
+        anfiles
+        anutils
+        anbase
+        catalogs
+        qfits
+        ${CAIRO_LIBRARIES}
+        ${PNG_LIBRARIES}
+        ${JPEG_LIBRARIES}
+        ${CFITSIO_LIBRARIES}
+        ws2_32
+        regex
+        m
+    )
+
+
+endif()
 
 if(USE_BUNDLED_GSL)
     target_link_libraries(solve-field gsl-an)
@@ -509,6 +604,49 @@ add_custom_target(copy_dlls ALL
         ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "C:/msys64/mingw64/bin/libngtcp2_crypto_ossl-0.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    # 绘图相关的DLL (如果有Cairo的话)
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libcairo-2.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libpng16-16.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libjpeg-8.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libstdc++-6.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libfreetype-6.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libexpat-1.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libpixman-1-0.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libfontconfig-1.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libglib-2.0-0.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libgobject-2.0-0.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libgraphite2.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libpcre2-8-0.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libbz2-1.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libharfbuzz-0.dll"
         ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
     # Copy image2pnm batch wrapper
     COMMAND ${CMAKE_COMMAND} -E copy_if_different

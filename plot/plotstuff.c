@@ -37,6 +37,29 @@
 #include "errors.h"
 #include "anwcs.h"
 
+#ifdef _WIN32
+// Windows doesn't have vasprintf, so we implement it
+static int vasprintf(char **strp, const char *fmt, va_list ap) {
+    va_list ap_copy;
+    int len;
+
+    va_copy(ap_copy, ap);
+    len = vsnprintf(NULL, 0, fmt, ap_copy);
+    va_end(ap_copy);
+
+    if (len < 0) {
+        *strp = NULL;
+        return -1;
+    }
+
+    *strp = malloc(len + 1);
+    if (*strp == NULL) {
+        return -1;
+    }
+
+    return vsnprintf(*strp, len + 1, fmt, ap);
+}
+#endif
 
 enum cmdtype {
     CIRCLE,
