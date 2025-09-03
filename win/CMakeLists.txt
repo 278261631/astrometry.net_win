@@ -87,6 +87,8 @@ else()
     set(HAVE_JPEG FALSE)
 endif()
 
+# Netpbm功能现在使用内置实现，不需要外部库
+
 # 查找GSL (如果系统有的话)
 pkg_check_modules(GSL gsl)
 if(NOT GSL_FOUND)

@@ -17,9 +17,10 @@
 
 #include "os-features.h"
 
-#if HAVE_NETPBM
-#include <netpbm/ppm.h>
-#endif
+// 简单的PPM格式定义，不依赖netpbm库
+typedef struct {
+    unsigned char r, g, b;
+} simple_pixel;
 
 #include "ioutils.h"
 #include "cairoutils.h"
@@ -538,15 +539,9 @@ static int writeout(const char* outfn, unsigned char* img, int W, int H, int for
     return 0;
 }
 
-#if HAVE_NETPBM
 void cairoutils_fake_ppm_init() {
-    char* fake_args[] = {"cairoutils"};
-    int fake_argc = 1;
-    ppm_init(&fake_argc, fake_args);
+    // 简单实现，不需要初始化
 }
-#else
-void cairoutils_fake_ppm_init() {}
-#endif
 
 int cairoutils_write_ppm(const char* outfn, unsigned char* img, int W, int H) {
     return writeout(outfn, img, W, H, PPM);
@@ -667,55 +662,160 @@ void cairoutils_rgba_to_argb32_flip(const unsigned char* inimg,
 }
 
 
-#if HAVE_NETPBM
-unsigned char* cairoutils_read_ppm_stream(FILE* fin, int* pW, int* pH) {
-    int x,y;
-    int W, H, format;
-    pixval maxval;
-    pixel* pixelrow;
-    unsigned char* img;
+// 跳过PPM文件中的空白字符和注释
+static void skip_ppm_whitespace_and_comments(FILE* fin) {
+    int c;
+    while ((c = fgetc(fin)) != EOF) {
+        if (c == '#') {
+            // 跳过注释行
+            while ((c = fgetc(fin)) != EOF && c != '\n' && c != '\r');
+        } else if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            // 跳过空白字符
+            continue;
+        } else {
+            // 非空白字符，放回去
+            ungetc(c, fin);
+            break;
+        }
+    }
+}
 
-    ppm_readppminit(fin, &W, &H, &maxval, &format);
-    pixelrow = ppm_allocrow(W);
-    //printf("%i x %i, maxval %i, format 0x%x\n", C, R, maxval, format);
+// 读取PPM文件中的一个整数
+static int read_ppm_int(FILE* fin) {
+    int value = 0;
+    int c;
+
+    skip_ppm_whitespace_and_comments(fin);
+
+    while ((c = fgetc(fin)) != EOF && c >= '0' && c <= '9') {
+        value = value * 10 + (c - '0');
+    }
+
+    if (c != EOF) {
+        ungetc(c, fin);
+    }
+
+    return value;
+}
+
+unsigned char* cairoutils_read_ppm_stream(FILE* fin, int* pW, int* pH) {
+    char magic[3] = {0};
+    int W, H, maxval;
+    unsigned char* img;
+    int x, y;
+    int is_binary = 0;
+
+    // 读取PPM魔数
+    if (fread(magic, 1, 2, fin) != 2) {
+        ERROR("Failed to read PPM magic number");
+        return NULL;
+    }
+    magic[2] = '\0';
+
+    // 检查PPM格式
+    if (strcmp(magic, "P3") == 0) {
+        is_binary = 0; // ASCII格式
+    } else if (strcmp(magic, "P6") == 0) {
+        is_binary = 1; // 二进制格式
+    } else {
+        ERROR("Unsupported PPM format: %s (only P3 and P6 are supported)", magic);
+        return NULL;
+    }
+
+    // 读取宽度、高度和最大值
+    W = read_ppm_int(fin);
+    H = read_ppm_int(fin);
+    maxval = read_ppm_int(fin);
+
+    if (W <= 0 || H <= 0 || maxval <= 0 || maxval > 65535) {
+        ERROR("Invalid PPM dimensions or maxval: %dx%d, maxval=%d", W, H, maxval);
+        return NULL;
+    }
+
+    // 跳过头部后的第一个空白字符
+    skip_ppm_whitespace_and_comments(fin);
+
     if (pW) *pW = W;
     if (pH) *pH = H;
 
-    // Allocate image.
+    // 分配图像内存 (RGBA格式)
     img = malloc(4 * W * H);
     if (!img) {
-        fprintf(stderr, "Failed to allocate an image of size %ix%i x 4\n", W, H);
+        ERROR("Failed to allocate image memory for %dx%d image", W, H);
         return NULL;
     }
-    for (y=0; y<H; y++) {
-        ppm_readppmrow(fin, pixelrow, W, maxval, format);
-        for (x=0; x<W; x++) {
-            unsigned char a,r,g,b;
-            pixel p;
-            if (maxval == 255)
-                p = pixelrow[x];
-            else
-                PPM_DEPTH(p, pixelrow[x], maxval, 255);
-            a = 255;
-            r = PPM_GETR(p);
-            g = PPM_GETG(p);
-            b = PPM_GETB(p);
 
-            img[(y*W + x)*4 + 0] = r;
-            img[(y*W + x)*4 + 1] = g;
-            img[(y*W + x)*4 + 2] = b;
-            img[(y*W + x)*4 + 3] = a;
+    // 读取像素数据
+    for (y = 0; y < H; y++) {
+        for (x = 0; x < W; x++) {
+            unsigned char rgb[3];
+            int idx = (y * W + x) * 4;
+
+            if (is_binary) {
+                // P6格式：二进制数据
+                if (maxval < 256) {
+                    // 8位数据
+                    size_t bytes_read = fread(rgb, 1, 3, fin);
+                    if (bytes_read != 3) {
+                        if (feof(fin)) {
+                            // 文件结尾，用黑色填充剩余像素
+                            memset(rgb, 0, 3);
+                        } else {
+                            ERROR("Failed to read pixel data at (%d,%d), only got %zu bytes", x, y, bytes_read);
+                            free(img);
+                            return NULL;
+                        }
+                    }
+                } else {
+                    // 16位数据，读取并转换为8位
+                    unsigned short rgb16[3];
+                    size_t shorts_read = fread(rgb16, 2, 3, fin);
+                    if (shorts_read != 3) {
+                        if (feof(fin)) {
+                            // 文件结尾，用黑色填充
+                            memset(rgb, 0, 3);
+                        } else {
+                            ERROR("Failed to read 16-bit pixel data at (%d,%d), only got %zu shorts", x, y, shorts_read);
+                            free(img);
+                            return NULL;
+                        }
+                    } else {
+                        rgb[0] = (rgb16[0] * 255) / maxval;
+                        rgb[1] = (rgb16[1] * 255) / maxval;
+                        rgb[2] = (rgb16[2] * 255) / maxval;
+                    }
+                }
+            } else {
+                // P3格式：ASCII数据
+                int r, g, b;
+                r = read_ppm_int(fin);
+                g = read_ppm_int(fin);
+                b = read_ppm_int(fin);
+
+                if (feof(fin) || r < 0 || g < 0 || b < 0) {
+                    // 文件结尾或读取失败，用黑色填充
+                    rgb[0] = rgb[1] = rgb[2] = 0;
+                } else if (r > maxval || g > maxval || b > maxval) {
+                    ERROR("Invalid pixel values at (%d,%d): %d,%d,%d (maxval=%d)", x, y, r, g, b, maxval);
+                    free(img);
+                    return NULL;
+                } else {
+                    rgb[0] = (r * 255) / maxval;
+                    rgb[1] = (g * 255) / maxval;
+                    rgb[2] = (b * 255) / maxval;
+                }
+            }
+
+            // 转换为RGBA格式
+            img[idx + 0] = rgb[0]; // R
+            img[idx + 1] = rgb[1]; // G
+            img[idx + 2] = rgb[2]; // B
+            img[idx + 3] = 255;    // A (不透明)
         }
     }
-    ppm_freerow(pixelrow);
+
     return img;
 }
-#else
-unsigned char* cairoutils_read_ppm_stream(FILE* fin, int* pW, int* pH) {
-    ERROR("Netpbm is not available; can't read PPM images");
-    return NULL;
-}
-#endif
 
 unsigned char* cairoutils_read_ppm(const char* infn, int* pW, int* pH) {
     FILE* fin;

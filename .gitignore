@@ -99,3 +99,4 @@ report.txt
 .DS_Store
 /win/build
 /win/temp
+/.idea
