@@ -390,6 +390,18 @@ add_executable(uniformize uniformize.c)
 # 创建 test_fits_read 测试程序
 add_executable(test_fits_read test_fits_read.c)
 
+# 创建 debug_fits 调试程序
+add_executable(debug_fits debug_fits.c)
+
+# 创建 debug_cfitsio 调试程序
+add_executable(debug_cfitsio debug_cfitsio.c)
+
+# 创建 debug_qfits_detailed 调试程序
+add_executable(debug_qfits_detailed debug_qfits_detailed.c)
+
+# 创建 test_anqfits 测试程序
+add_executable(test_anqfits test_anqfits.c)
+
 # 创建绘图程序 (如果有Cairo的话)
 if(HAVE_CAIRO)
     add_executable(plotxy ../plot/plotxy-main.c)
@@ -483,6 +495,44 @@ target_link_libraries(test_fits_read
     ${CFITSIO_LIBRARIES}
     ws2_32
     regex
+    m
+)
+
+# 链接 debug_fits
+target_link_libraries(debug_fits
+    anfiles
+    anutils
+    anbase
+    qfits
+    ${CFITSIO_LIBRARIES}
+    ws2_32
+    regex
+    m
+)
+
+# 链接 debug_cfitsio
+target_link_libraries(debug_cfitsio
+    ${CFITSIO_LIBRARIES}
+    ws2_32
+    m
+)
+
+# 链接 debug_qfits_detailed
+target_link_libraries(debug_qfits_detailed
+    anfiles
+    anutils
+    anbase
+    qfits
+    ${CFITSIO_LIBRARIES}
+    ws2_32
+    regex
+    m
+)
+
+# 链接 test_anqfits
+target_link_libraries(test_anqfits
+    qfits
+    ws2_32
     m
 )
 

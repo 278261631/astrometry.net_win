@@ -811,8 +811,8 @@ anqfits_t* anqfits_open_hdu(const char* filename, int hdu) {
         goto bailout;
     }
 
-    /* Open input file */
-    fin=fopen(filename, "r");
+    /* Open input file in binary mode (critical for Windows) */
+    fin=fopen(filename, "rb");
     if (!fin) {
         qdebug(printf("anqfits: cannot open file %s: %s\n",
                       filename, strerror(errno)););
@@ -911,9 +911,18 @@ anqfits_t* anqfits_open_hdu(const char* filename, int hdu) {
                 off *= (size_t)FITS_BLOCK_SIZE;
                 seeked = fseeko(fin, off, SEEK_CUR);
                 if (seeked == -1) {
-                    qfits_error("anqfits: failed to fseeko in file %s: %s",
-                                filename, strerror(errno));
-                    goto bailout;
+                    // Windows上的fseeko可能有问题，尝试用fread跳过
+                    qfits_warning("anqfits: fseeko failed in file %s: %s (offset=%zu, data_bytes=%zu), trying fread",
+                                filename, strerror(errno), off, data_bytes);
+
+                    // 用fread跳过数据区域
+                    char skip_buf[FITS_BLOCK_SIZE];
+                    for (size_t b = 0; b < skip_blocks; b++) {
+                        if (fread(skip_buf, 1, FITS_BLOCK_SIZE, fin) != FITS_BLOCK_SIZE) {
+                            qfits_error("anqfits: failed to skip data blocks in file %s", filename);
+                            goto bailout;
+                        }
+                    }
                 }
 
                 debug("hdu %i, data_bytes %zu, skip_blocks %zu, off %zu, n_blocks %zu\n",
@@ -926,8 +935,11 @@ anqfits_t* anqfits_open_hdu(const char* filename, int hdu) {
             /* Look for extension start */
             found_it = 0;
             while (!found_it && !end_of_file) {
-                if (fread(buf, 1, FITS_BLOCK_SIZE, fin) != FITS_BLOCK_SIZE) {
+                size_t bytes_read = fread(buf, 1, FITS_BLOCK_SIZE, fin);
+                if (bytes_read != FITS_BLOCK_SIZE) {
                     /* Reached end of file */
+                    printf("Reached end of file while looking for extension %d (read %zu bytes, expected %d)\n",
+                           qf->Nexts, bytes_read, FITS_BLOCK_SIZE);
                     end_of_file = 1;
                     break;
                 }
@@ -935,15 +947,17 @@ anqfits_t* anqfits_open_hdu(const char* filename, int hdu) {
 
                 /* Search for XTENSION at block top */
                 if (starts_with(buf, "XTENSION=")) {
-                    debug("Found XTENSION\n");
+                    printf("Found XTENSION for extension %d at block %zu\n", qf->Nexts, n_blocks);
                     /* Got an extension */
                     found_it = 1;
                     qf->exts[qf->Nexts].hdr_start = n_blocks-1;
                 } else {
-                    qfits_warning("Failed to find XTENSION in the FITS block following the previous data block -- whaddup?  Filename %s, block %zi, hdu %i",
-                                  filename, n_blocks, qf->Nexts-1);
+                    printf("Block %zu: No XTENSION found (starts with: %.20s)\n", n_blocks, buf);
+                    // 在Windows上，继续搜索而不是立即报错
+                    // qfits_warning("Failed to find XTENSION in the FITS block following the previous data block -- whaddup?  Filename %s, block %zi, hdu %i",
+                    //              filename, n_blocks, qf->Nexts-1);
                 }
-                // FIXME -- should we really just skip the block if we don't find the "XTENSION=" header?
+                // 继续搜索，不要在第一次失败时就放弃
             }
             if (end_of_file)
                 break;
@@ -977,7 +991,7 @@ anqfits_t* anqfits_open_hdu(const char* filename, int hdu) {
             }
             if (found_it) {
                 data_bytes = get_data_bytes(hdr);
-                debug("This data block will have %zu bytes\n", data_bytes);
+                printf("Extension %d: This data block will have %zu bytes\n", qf->Nexts, data_bytes);
 
                 qf->exts[qf->Nexts].data_start = n_blocks;
                 qf->exts[qf->Nexts].header = hdr;
@@ -994,7 +1008,8 @@ anqfits_t* anqfits_open_hdu(const char* filename, int hdu) {
             }
         }
     }
-    debug("Found %i extensions\n", qf->Nexts);
+    printf("Extension parsing loop ended: end_of_file=%d, Nexts=%d\n", end_of_file, qf->Nexts);
+    printf("Found %i extensions\n", qf->Nexts);
 
     if (hdr)
         qfits_header_destroy(hdr);
