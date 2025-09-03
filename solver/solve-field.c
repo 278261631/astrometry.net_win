@@ -312,6 +312,69 @@ static int plot_source_overlay(const char* plotxy, augment_xylist_t* axy, const 
         sl_appendf(cmdline, "%f", plotscale);
     }
     sl_append(cmdline, "-C red -w 2 -N 50 -x 1 -y 1");
+
+#ifdef _WIN32
+    // 在Windows上使用临时文件而不是管道，因为Windows的管道处理有问题
+    char* tempppn = create_temp_file("plotxy.ppm", NULL);
+    sl_append(cmdline, "-P");  // 输出PPM格式
+    sl_append(cmdline, "-o");
+    append_escape(cmdline, tempppn);
+
+    cmd = sl_implode(cmdline, " ");
+    sl_free2(cmdline);
+
+    // 运行第一个plotxy命令
+    if (run_command(cmd, &ctrlc)) {
+        ERROR("First plotting command %s", (ctrlc ? "was cancelled" : "failed"));
+        free(cmd);
+        free(tempppn);
+        return -1;
+    }
+    free(cmd);
+
+    // 创建第二个命令
+    cmdline = sl_new(16);
+    append_executable(cmdline, plotxy, me);
+    sl_append(cmdline, "-i");
+    append_escape(cmdline, axy->axyfn);
+    if (axy->xcol) {
+        sl_append(cmdline, "-X");
+        append_escape(cmdline, axy->xcol);
+    }
+    if (axy->ycol) {
+        sl_append(cmdline, "-Y");
+        append_escape(cmdline, axy->ycol);
+    }
+    sl_append(cmdline, "-I");
+    append_escape(cmdline, tempppn);
+    sl_append(cmdline, "-w 2 -r 3 -C red -n 50 -N 200 -x 1 -y 1");
+    if (plotscale != 1.0) {
+        sl_append(cmdline, "-S");
+        sl_appendf(cmdline, "%f", plotscale);
+    }
+    sl_append(cmdline, "-o");
+    append_escape(cmdline, objsfn);
+
+    cmd = sl_implode(cmdline, " ");
+    sl_free2(cmdline);
+
+    // 运行第二个plotxy命令
+    if (run_command(cmd, &ctrlc)) {
+        ERROR("Second plotting command %s", (ctrlc ? "was cancelled" : "failed"));
+        free(cmd);
+        unlink(tempppn);
+        free(tempppn);
+        return -1;
+    }
+    free(cmd);
+
+    // 清理临时文件
+    unlink(tempppn);
+    free(tempppn);
+
+    return 0;
+#else
+    // Unix/Linux上使用原来的管道方式
     sl_append(cmdline, "-P");
     sl_append(cmdline, "|");
 
@@ -334,6 +397,7 @@ static int plot_source_overlay(const char* plotxy, augment_xylist_t* axy, const 
 
     sl_append(cmdline, ">");
     append_escape(cmdline, objsfn);
+#endif
 
     cmd = sl_implode(cmdline, " ");
     sl_free2(cmdline);

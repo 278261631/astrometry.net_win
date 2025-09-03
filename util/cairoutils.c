@@ -17,6 +17,11 @@
 
 #include "os-features.h"
 
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif
+
 // 简单的PPM格式定义，不依赖netpbm库
 typedef struct {
     unsigned char r, g, b;
@@ -450,11 +455,31 @@ static int streamout(FILE* fout, unsigned char* img, int W, int H, int format) {
     if (format == PPM) {
         // PPM...
         int i;
-        fprintf(fout, "P6 %i %i %i\n", W, H, 255);
+        // 确保在Windows上使用二进制模式
+#ifdef _WIN32
+        if (fout == stdout) {
+            _setmode(_fileno(stdout), _O_BINARY);
+        }
+#endif
+        if (fprintf(fout, "P6 %i %i %i\n", W, H, 255) < 0) {
+            fprintf(stderr, "Failed to write PPM header: %s\n", strerror(errno));
+            return -1;
+        }
+        if (fflush(fout) != 0) {
+            fprintf(stderr, "Failed to flush PPM header: %s\n", strerror(errno));
+            return -1;
+        }
         for (i=0; i<(H*W); i++) {
             unsigned char* pix = img + 4*i;
-            if (fwrite(pix, 1, 3, fout) != 3) {
-                fprintf(stderr, "Failed to write pixels for PPM output: %s\n", strerror(errno));
+            size_t written = fwrite(pix, 1, 3, fout);
+            if (written != 3) {
+                if (ferror(fout)) {
+                    fprintf(stderr, "Failed to write pixels for PPM output at pixel %d: %s\n", i, strerror(errno));
+                } else if (feof(fout)) {
+                    fprintf(stderr, "Unexpected EOF while writing PPM output at pixel %d\n", i);
+                } else {
+                    fprintf(stderr, "Failed to write pixels for PPM output at pixel %d: only wrote %zu bytes\n", i, written);
+                }
                 return -1;
             }
         }
@@ -520,6 +545,15 @@ static int writeout(const char* outfn, unsigned char* img, int W, int H, int for
     int outstdout = (!outfn || streq(outfn, "-"));
     if (outstdout) {
         fout = stdout;
+#ifdef _WIN32
+        // 在Windows上，确保stdout是二进制模式（对于PPM等二进制格式）
+        if (format == PPM || format == PNG || format == JPEG) {
+            if (_setmode(_fileno(stdout), _O_BINARY) == -1) {
+                fprintf(stderr, "Failed to set stdout to binary mode: %s\n", strerror(errno));
+                return -1;
+            }
+        }
+#endif
     } else {
         fout = fopen(outfn, "wb");
         if (!fout) {
