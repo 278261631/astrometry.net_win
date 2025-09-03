@@ -168,7 +168,7 @@ set(CATALOGS_SOURCES
     ../catalogs/ucac4.c
     ../catalogs/usnob.c
     ../catalogs/2mass.c
-    # ../catalogs/openngc.c  # Requires generated files, skip for Windows build
+    ../catalogs/openngc.c  # Now enabled - generated files available
     ../catalogs/stellarium-constellations.c
 )
 
