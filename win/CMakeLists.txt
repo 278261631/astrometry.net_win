@@ -414,6 +414,7 @@ add_executable(test_anqfits test_anqfits.c)
 # 创建绘图程序 (如果有Cairo的话)
 if(HAVE_CAIRO)
     add_executable(plotxy ../plot/plotxy-main.c)
+    add_executable(plot-constellations ../plot/plot-constellations.c)
 endif()
 target_link_libraries(solve-field
     astrometry
@@ -595,6 +596,21 @@ if(HAVE_CAIRO)
         m
     )
 
+    target_link_libraries(plot-constellations
+        plot
+        anfiles
+        anutils
+        anbase
+        catalogs
+        qfits
+        ${CAIRO_LIBRARIES}
+        ${PNG_LIBRARIES}
+        ${JPEG_LIBRARIES}
+        ${CFITSIO_LIBRARIES}
+        ws2_32
+        regex
+        m
+    )
 
 endif()
 
