@@ -741,6 +741,13 @@ add_custom_target(copy_dlls ALL
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "C:/msys64/mingw64/bin/libharfbuzz-0.dll"
         ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    # Additional DLLs from build.bat (libgsl-28.dll already copied above)
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/libgslcblas-0.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "C:/msys64/mingw64/bin/zlib1.dll"
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
     # Copy image2pnm batch wrapper
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/image2pnm.bat"
@@ -751,7 +758,7 @@ add_custom_target(copy_dlls ALL
         -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
         -P "${CMAKE_CURRENT_SOURCE_DIR}/copy_netpbm_tools.cmake"
 
-    COMMENT "Copying DLL dependencies, scripts and NetPBM tools"
+    COMMENT "Copying DLL dependencies, scripts, config files and NetPBM tools"
 )
 
 # 确保在构建solve-field和astrometry-engine后复制DLL

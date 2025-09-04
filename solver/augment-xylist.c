@@ -861,7 +861,7 @@ int augment_xylist(augment_xylist_t* axy,
                 // Second: convert PGM to FITS
                 sl_free2(cmd);
                 cmd = sl_new(16);
-                append_executable(cmd, "an-pnmtofits", me);
+                append_executable(cmd, "pnmtofits", me);
                 append_escape(cmd, pgmfn);
                 sl_append(cmd, ">");
                 append_escape(cmd, fitsimgfn);
@@ -872,7 +872,7 @@ int augment_xylist(augment_xylist_t* axy,
                 int result2 = system(full_cmd);
                 free(cmdstr);
                 if (result2 != 0) {
-                    ERROR("Failed to run an-pnmtofits command");
+                    ERROR("Failed to run pnmtofits command");
                     exit(-1);
                 }
 
@@ -884,7 +884,7 @@ int augment_xylist(augment_xylist_t* axy,
                 append_executable(cmd, "ppmtopgm", me);
                 append_escape(cmd, pnmfn);
                 sl_append(cmd, "|");
-                append_executable(cmd, "an-pnmtofits", me);
+                append_executable(cmd, "pnmtofits", me);
                 sl_append(cmd, ">");
                 append_escape(cmd, fitsimgfn);
                 run(cmd, verbose);
@@ -893,7 +893,7 @@ int augment_xylist(augment_xylist_t* axy,
             } else if (pnmtype == 'G') {
                 logverb("Converting PGM image to FITS...\n");
 
-                append_executable(cmd, "an-pnmtofits", me);
+                append_executable(cmd, "pnmtofits", me);
                 append_escape(cmd, pnmfn);
                 sl_append(cmd, ">");
                 append_escape(cmd, fitsimgfn);
@@ -930,7 +930,7 @@ int augment_xylist(augment_xylist_t* axy,
                 // Second: convert PGM to FITS
                 sl_free2(cmd);
                 cmd = sl_new(16);
-                append_executable(cmd, "an-pnmtofits", me);
+                append_executable(cmd, "pnmtofits", me);
                 append_escape(cmd, pgmfn);
                 sl_append(cmd, ">");
                 append_escape(cmd, fitsimgfn);
@@ -941,7 +941,7 @@ int augment_xylist(augment_xylist_t* axy,
                 int result2 = system(full_cmd);
                 free(cmdstr);
                 if (result2 != 0) {
-                    ERROR("Failed to run an-pnmtofits command");
+                    ERROR("Failed to run pnmtofits command");
                     exit(-1);
                 }
 #else
@@ -951,7 +951,7 @@ int augment_xylist(augment_xylist_t* axy,
                 sl_append(cmd, "3");
                 append_escape(cmd, pnmfn);
                 sl_append(cmd, "|");
-                append_executable(cmd, "an-pnmtofits", me);
+                append_executable(cmd, "pnmtofits", me);
                 sl_append(cmd, ">");
                 append_escape(cmd, fitsimgfn);
                 run(cmd, verbose);
