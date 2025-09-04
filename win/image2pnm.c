@@ -192,12 +192,8 @@ static int fallback_fits_conversion(int argc, char* argv[]) {
 
     // Check if it's a FITS file
     if (is_fits_file(input_file)) {
-        // Use an-fitstopnm for FITS files
-        if (extension > 0) {
-            snprintf(cmd, sizeof(cmd), "an-fitstopnm -e %d -i \"%s\"", extension, input_file);
-        } else {
-            snprintf(cmd, sizeof(cmd), "an-fitstopnm -i \"%s\"", input_file);
-        }
+        // Use standard fitstopnm for FITS files
+        snprintf(cmd, sizeof(cmd), "fitstopnm \"%s\"", input_file);
 
         if (output_file) {
             strcat(cmd, " > \"");
@@ -205,7 +201,10 @@ static int fallback_fits_conversion(int argc, char* argv[]) {
             strcat(cmd, "\"");
         }
 
-        return run_command(cmd);
+        printf("Running FITS conversion: %s\n", cmd);
+        int result = run_command(cmd);
+        printf("FITS conversion result: %d\n", result);
+        return result;
     } else {
         // Try netpbm tools for other image formats
         printf("Trying netpbm tools for image conversion...\n");

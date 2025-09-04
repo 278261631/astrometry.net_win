@@ -893,12 +893,36 @@ int augment_xylist(augment_xylist_t* axy,
             } else if (pnmtype == 'G') {
                 logverb("Converting PGM image to FITS...\n");
 
+#ifdef _WIN32
+                // Windows: use explicit command execution
+                append_executable(cmd, "pnmtofits", me);
+                append_escape(cmd, pnmfn);
+                sl_append(cmd, ">");
+                append_escape(cmd, fitsimgfn);
+
+                char* cmdstr = sl_implode(cmd, " ");
+                char full_cmd[4096];
+                snprintf(full_cmd, sizeof(full_cmd), "cmd /c \"%s\"", cmdstr);
+                logverb("Running: %s\n", full_cmd);
+                int result = system(full_cmd);
+                free(cmdstr);
+                if (result != 0) {
+                    ERROR("Failed to run pnmtofits command");
+                    exit(-1);
+                }
+
+                // Clear cmd for next use
+                sl_free2(cmd);
+                cmd = sl_new(16);
+#else
+                // Unix: use run function
                 append_executable(cmd, "pnmtofits", me);
                 append_escape(cmd, pnmfn);
                 sl_append(cmd, ">");
                 append_escape(cmd, fitsimgfn);
 
                 run(cmd, verbose);
+#endif
 
             } else if (pnmtype == 'B') {
                 logverb("Converting PBM image to FITS...\n");
