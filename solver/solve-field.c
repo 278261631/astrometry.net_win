@@ -426,6 +426,8 @@ static int plot_index_overlay(const char* plotxy, augment_xylist_t* axy, const c
     anbool ctrlc;
     char* imgfn;
     char* plotquad = NULL;
+    char* temp_ppm1 = NULL;
+    char* temp_ppm2 = NULL;
 
     assert(axy->matchfn);
     mf = matchfile_open(axy->matchfn);
@@ -440,24 +442,53 @@ static int plot_index_overlay(const char* plotxy, augment_xylist_t* axy, const c
         return -1;
     }
 
-    // sources + index overlay
+    // Create temporary files for intermediate results
+    temp_ppm1 = create_temp_file("plotxy1.ppm", "temp");
+    temp_ppm2 = create_temp_file("plotxy2.ppm", "temp");
+    if (!temp_ppm1 || !temp_ppm2) {
+        ERROR("Failed to create temporary files");
+        if (temp_ppm1) free(temp_ppm1);
+        if (temp_ppm2) free(temp_ppm2);
+        matchfile_close(mf);
+        return -1;
+    }
+
+    // Step 1: Generate base image with sources
+    sl_remove_all(cmdline);
     imgfn = axy->pnmfn;
 
     if (bgfn) {
         append_executable(cmdline, "jpegtopnm", me);
         append_escape(cmdline, bgfn);
-        sl_append(cmdline, "|");
-        imgfn = "-";
-    } else {
-        if (axy->imagefn && plotscale != 1.0) {
-            append_executable(cmdline, "pnmscale", me);
-            sl_appendf(cmdline, "%f", plotscale);
-            append_escape(cmdline, axy->pnmfn);
-            sl_append(cmdline, "|");
-            imgfn = "-";
+        sl_append(cmdline, ">");
+        append_escape(cmdline, temp_ppm1);
+        cmd = sl_implode(cmdline, " ");
+        logverb("Step 1a: %s\n", cmd);
+        if (run_command(cmd, &ctrlc)) {
+            ERROR("Failed to convert background image");
+            goto cleanup;
         }
+        free(cmd);
+        imgfn = temp_ppm1;
+        sl_remove_all(cmdline);
+    } else if (axy->imagefn && plotscale != 1.0) {
+        append_executable(cmdline, "pnmscale", me);
+        sl_appendf(cmdline, "%f", plotscale);
+        append_escape(cmdline, axy->pnmfn);
+        sl_append(cmdline, ">");
+        append_escape(cmdline, temp_ppm1);
+        cmd = sl_implode(cmdline, " ");
+        logverb("Step 1b: %s\n", cmd);
+        if (run_command(cmd, &ctrlc)) {
+            ERROR("Failed to scale image");
+            goto cleanup;
+        }
+        free(cmd);
+        imgfn = temp_ppm1;
+        sl_remove_all(cmdline);
     }
 
+    // Step 2: Plot sources on the image
     append_executable(cmdline, plotxy, me);
     if (imgfn) {
         sl_append(cmdline, "-I");
@@ -481,54 +512,151 @@ static int plot_index_overlay(const char* plotxy, augment_xylist_t* axy, const c
     }
     sl_append(cmdline, "-C red -w 2 -r 6 -N 200 -x 0 -y 0");
     sl_append(cmdline, "-P");
-    sl_append(cmdline, "|");
+    sl_append(cmdline, "-o");
+    append_escape(cmdline, temp_ppm1);
+
+    cmd = sl_implode(cmdline, " ");
+    logverb("Step 2: %s\n", cmd);
+    if (run_command(cmd, &ctrlc)) {
+        ERROR("Failed to plot sources");
+        goto cleanup;
+    }
+    free(cmd);
+
+    // Step 3: Add index objects
+    sl_remove_all(cmdline);
     append_executable(cmdline, plotxy, me);
     sl_append(cmdline, "-i");
     append_escape(cmdline, indxylsfn);
-    sl_append(cmdline, "-I - -w 2 -r 4 -C green -x 0 -y 0");
+    sl_append(cmdline, "-I");
+    append_escape(cmdline, temp_ppm1);
+    sl_append(cmdline, "-w 2 -r 4 -C green -x 0 -y 0");
     if (plotscale != 1.0) {
         sl_append(cmdline, "-S");
         sl_appendf(cmdline, "%f", plotscale);
     }
+    sl_append(cmdline, "-P");
+    sl_append(cmdline, "-o");
+    append_escape(cmdline, temp_ppm2);
 
-    // if we solved by verifying an existing WCS, there is no quad.
-    if (mo->dimquads > 0) {
-	plotquad = find_executable("plotquad", me);
-	if (!plotquad) {
-	    // Try ../plot/plotquad
-	    plotquad = find_executable("../plot/plotquad", me);
-	}
-	if (plotquad) {
-            sl_append(cmdline, " -P |");
-            append_executable(cmdline, plotquad, me);
-            sl_append(cmdline, "-I -");
-            sl_append(cmdline, "-C green");
-            sl_append(cmdline, "-w 2");
-            sl_appendf(cmdline, "-d %i", mo->dimquads);
-            if (plotscale != 1.0) {
-                sl_append(cmdline, "-s");
-                sl_appendf(cmdline, "%f", plotscale);
-            }
-            for (i=0; i<(2 * mo->dimquads); i++)
-                sl_appendf(cmdline, " %g", mo->quadpix_orig[i]);
-	}
-    }
-
-    matchfile_close(mf);
-			
-    sl_append(cmdline, ">");
-    append_escape(cmdline, redgreenfn);
-    
     cmd = sl_implode(cmdline, " ");
-    sl_free2(cmdline);
-    logverb("Running:\n  %s\n", cmd);
+    logverb("Step 3: %s\n", cmd);
     if (run_command(cmd, &ctrlc)) {
-        ERROR("Plotting commands %s; exiting.", (ctrlc ? "were cancelled" : "failed"));
-        return -1;
+        ERROR("Failed to plot index objects");
+        goto cleanup;
     }
     free(cmd);
-    free(plotquad);
+
+    // Step 4: Add quad overlay if available
+    if (mo->dimquads > 0) {
+        plotquad = find_executable("plotquad", me);
+        if (!plotquad) {
+            // Try ../plot/plotquad
+            plotquad = find_executable("../plot/plotquad", me);
+        }
+        if (plotquad) {
+            // Create a temporary xylist file with quad coordinates
+            char* temp_xyls = create_temp_file("quad.xyls", "temp");
+            if (!temp_xyls) {
+                ERROR("Failed to create temporary xylist file");
+                goto cleanup;
+            }
+
+            // Write quad coordinates to temporary xylist file
+            FILE* fp = fopen(temp_xyls, "w");
+            if (!fp) {
+                ERROR("Failed to open temporary xylist file for writing");
+                free(temp_xyls);
+                goto cleanup;
+            }
+            fprintf(fp, "# X Y\n");
+            for (i=0; i<(2 * mo->dimquads); i+=2) {
+                fprintf(fp, "%g %g\n", mo->quadpix_orig[i], mo->quadpix_orig[i+1]);
+            }
+            fclose(fp);
+
+            // Use plotxy to add quad overlay
+            sl_remove_all(cmdline);
+            append_executable(cmdline, "plotxy", me);
+            sl_append(cmdline, "-I");
+            append_escape(cmdline, temp_ppm2);
+            sl_append(cmdline, "-i");
+            append_escape(cmdline, temp_xyls);
+            sl_append(cmdline, "-C green");
+            sl_append(cmdline, "-w 2");
+            sl_append(cmdline, "-r 3");
+            sl_append(cmdline, "-x 0 -y 0");
+            if (plotscale != 1.0) {
+                sl_append(cmdline, "-S");
+                sl_appendf(cmdline, "%f", plotscale);
+            }
+            sl_append(cmdline, ">");
+            append_escape(cmdline, redgreenfn);
+
+            cmd = sl_implode(cmdline, " ");
+            logverb("Step 4 (quad overlay with plotxy): %s\n", cmd);
+            if (run_command(cmd, &ctrlc)) {
+                ERROR("Failed to plot quad overlay");
+                unlink(temp_xyls);
+                free(temp_xyls);
+                goto cleanup;
+            }
+            free(cmd);
+            unlink(temp_xyls);
+            free(temp_xyls);
+        } else {
+            // No plotquad available, just copy temp_ppm2 to final output
+            sl_remove_all(cmdline);
+#ifdef _WIN32
+            sl_append(cmdline, "cmd /c copy");
+#else
+            append_executable(cmdline, "cp", me);
+#endif
+            append_escape(cmdline, temp_ppm2);
+            append_escape(cmdline, redgreenfn);
+            cmd = sl_implode(cmdline, " ");
+            logverb("Step 4 (no quad): %s\n", cmd);
+            if (run_command(cmd, &ctrlc)) {
+                ERROR("Failed to copy final image");
+                goto cleanup;
+            }
+            free(cmd);
+        }
+    } else {
+        // No quad to plot, just copy temp_ppm2 to final output
+        sl_remove_all(cmdline);
+#ifdef _WIN32
+        sl_append(cmdline, "cmd /c copy");
+#else
+        append_executable(cmdline, "cp", me);
+#endif
+        append_escape(cmdline, temp_ppm2);
+        append_escape(cmdline, redgreenfn);
+        cmd = sl_implode(cmdline, " ");
+        logverb("Step 4 (no quad data): %s\n", cmd);
+        if (run_command(cmd, &ctrlc)) {
+            ERROR("Failed to copy final image");
+            goto cleanup;
+        }
+        free(cmd);
+    }
+
+    // Cleanup and success
+    matchfile_close(mf);
+    sl_free2(cmdline);
+    if (temp_ppm1) { unlink(temp_ppm1); free(temp_ppm1); }
+    if (temp_ppm2) { unlink(temp_ppm2); free(temp_ppm2); }
+    if (plotquad) free(plotquad);
     return 0;
+
+cleanup:
+    // Error cleanup
+    matchfile_close(mf);
+    sl_free2(cmdline);
+    if (temp_ppm1) { unlink(temp_ppm1); free(temp_ppm1); }
+    if (temp_ppm2) { unlink(temp_ppm2); free(temp_ppm2); }
+    if (plotquad) free(plotquad);
+    return -1;
 }
 
 static int plot_annotations(augment_xylist_t* axy, const char* me, anbool verbose,
