@@ -311,7 +311,7 @@ static int plot_source_overlay(const char* plotxy, augment_xylist_t* axy, const 
         sl_append(cmdline, "-S");
         sl_appendf(cmdline, "%f", plotscale);
     }
-    sl_append(cmdline, "-C red -w 2 -N 50 -x 1 -y 1");
+    sl_append(cmdline, "-C red -w 2 -N 50 -x 0 -y 0");
 
 #ifdef _WIN32
     // 在Windows上使用临时文件而不是管道，因为Windows的管道处理有问题
@@ -347,7 +347,7 @@ static int plot_source_overlay(const char* plotxy, augment_xylist_t* axy, const 
     }
     sl_append(cmdline, "-I");
     append_escape(cmdline, tempppn);
-    sl_append(cmdline, "-w 2 -r 3 -C red -n 50 -N 200 -x 1 -y 1");
+    sl_append(cmdline, "-w 2 -r 3 -C red -n 50 -N 200 -x 0 -y 0");
     if (plotscale != 1.0) {
         sl_append(cmdline, "-S");
         sl_appendf(cmdline, "%f", plotscale);
@@ -389,7 +389,7 @@ static int plot_source_overlay(const char* plotxy, augment_xylist_t* axy, const 
         sl_append(cmdline, "-Y");
         append_escape(cmdline, axy->ycol);
     }
-    sl_append(cmdline, "-I - -w 2 -r 3 -C red -n 50 -N 200 -x 1 -y 1");
+    sl_append(cmdline, "-I - -w 2 -r 3 -C red -n 50 -N 200 -x 0 -y 0");
     if (plotscale != 1.0) {
         sl_append(cmdline, "-S");
         sl_appendf(cmdline, "%f", plotscale);
@@ -479,13 +479,13 @@ static int plot_index_overlay(const char* plotxy, augment_xylist_t* axy, const c
         sl_append(cmdline, "-S");
         sl_appendf(cmdline, "%f", plotscale);
     }
-    sl_append(cmdline, "-C red -w 2 -r 6 -N 200 -x 1 -y 1");
+    sl_append(cmdline, "-C red -w 2 -r 6 -N 200 -x 0 -y 0");
     sl_append(cmdline, "-P");
     sl_append(cmdline, "|");
     append_executable(cmdline, plotxy, me);
     sl_append(cmdline, "-i");
     append_escape(cmdline, indxylsfn);
-    sl_append(cmdline, "-I - -w 2 -r 4 -C green -x 1 -y 1");
+    sl_append(cmdline, "-I - -w 2 -r 4 -C green -x 0 -y 0");
     if (plotscale != 1.0) {
         sl_append(cmdline, "-S");
         sl_appendf(cmdline, "%f", plotscale);

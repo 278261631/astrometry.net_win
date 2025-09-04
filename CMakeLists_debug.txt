@@ -1,0 +1,18 @@
+cmake_minimum_required(VERSION 3.10)
+project(debug_fits)
+
+# 设置编译器路径
+set(CMAKE_C_COMPILER "C:/msys64/mingw64/bin/gcc.exe")
+
+# 包含目录
+include_directories(../include)
+include_directories(../qfits-an)
+
+# 链接目录
+link_directories(../win/build/lib)
+
+# 创建可执行文件
+add_executable(debug_fits debug_fits.c)
+
+# 链接库
+target_link_libraries(debug_fits anbase qfits m)

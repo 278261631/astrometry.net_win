@@ -399,6 +399,15 @@ add_executable(debug_cfitsio debug_cfitsio.c)
 # 创建 debug_qfits_detailed 调试程序
 add_executable(debug_qfits_detailed debug_qfits_detailed.c)
 
+# 创建 debug_axy 调试程序 (暂时禁用，有链接问题)
+# add_executable(debug_axy debug_axy.c)
+
+# 创建 test_dsigma 测试程序 (暂时禁用，有链接问题)
+# add_executable(test_dsigma test_dsigma.c)
+
+# 创建 image2xy 程序
+add_executable(image2xy ../solver/image2xy-main.c)
+
 # 创建 test_anqfits 测试程序
 add_executable(test_anqfits test_anqfits.c)
 
@@ -519,6 +528,38 @@ target_link_libraries(debug_cfitsio
 
 # 链接 debug_qfits_detailed
 target_link_libraries(debug_qfits_detailed
+    anfiles
+    anutils
+    anbase
+    qfits
+    ${CFITSIO_LIBRARIES}
+    ws2_32
+    regex
+    m
+)
+
+# 链接 debug_axy (暂时禁用)
+# target_link_libraries(debug_axy
+#     anfiles
+#     anutils
+#     anbase
+#     qfits
+#     ${CFITSIO_LIBRARIES}
+#     ws2_32
+#     regex
+#     m
+# )
+
+# 链接 test_dsigma (暂时禁用)
+# target_link_libraries(test_dsigma
+#     anutils
+#     ws2_32
+#     m
+# )
+
+# 链接 image2xy
+target_link_libraries(image2xy
+    astrometry
     anfiles
     anutils
     anbase

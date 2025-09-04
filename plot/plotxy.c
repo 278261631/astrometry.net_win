@@ -160,6 +160,15 @@ int plot_xy_plot(const char* command, cairo_t* cairo,
                 starxy_sety(xy, i, args->scale * starxy_gety(xy, i));
             }
         }
+
+        // Flip Y coordinates: simplexy uses image coordinates (Y down),
+        // but Cairo uses mathematical coordinates (Y up)
+        if (pargs->H > 0) {
+            for (i=0; i<Nxy; i++) {
+                double y = starxy_gety(xy, i);
+                starxy_sety(xy, i, (pargs->H - 1) - y);
+            }
+        }
     }
 
     // Plot markers.
